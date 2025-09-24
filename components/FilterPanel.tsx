@@ -146,16 +146,16 @@ const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, is
         
         let noteClass = '';
         if (isUserNote) {
-          // If auto notes are on, user notes are blue for comparison.
-          // Otherwise, they are a standard gray.
+          // If auto notes are enabled, user notes are styled distinctly in blue.
           if (isAutoNotesEnabled) {
             noteClass = isDarkMode ? 'text-sky-400 font-medium' : 'text-sky-600 font-medium';
           } else {
-            noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+            // When auto notes are off, user notes are a lighter gray for better visibility in dark mode.
+            noteClass = isDarkMode ? 'text-slate-300' : 'text-slate-500';
           }
         } else if (isAutoNote) {
-          // Auto notes are always a subtle gray.
-          noteClass = isDarkMode ? 'text-slate-500' : 'text-gray-400';
+          // Auto notes are also a lighter gray to be less prominent but still clearly visible.
+          noteClass = isDarkMode ? 'text-slate-300' : 'text-gray-400';
         }
 
         return (
