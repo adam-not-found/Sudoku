@@ -12,6 +12,9 @@ interface SettingsPanelProps {
   currentDifficulty: Difficulty;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
+  onFillBoard: () => void;
+  isAutoNotesEnabled: boolean;
+  onToggleAutoNotes: () => void;
 }
 
 const difficulties: { id: Difficulty; label: string }[] = [
@@ -21,11 +24,20 @@ const difficulties: { id: Difficulty; label: string }[] = [
   { id: 'professional', label: 'Professional' },
 ];
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, currentDifficulty, isDarkMode, onToggleDarkMode }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ 
+  isOpen, 
+  onClose, 
+  currentDifficulty, 
+  isDarkMode, 
+  onToggleDarkMode, 
+  onFillBoard,
+  isAutoNotesEnabled,
+  onToggleAutoNotes
+}) => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(currentDifficulty);
 
   useEffect(() => {
-    // Reset selection to current game difficulty when panel is opened
+    // Reset selection when panel is opened
     if (isOpen) {
       setSelectedDifficulty(currentDifficulty);
     }
@@ -42,12 +54,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, currentD
   const modalBgClass = isDarkMode ? 'bg-slate-800/90 border-slate-600 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm';
   const modalTextClass = isDarkMode ? 'text-slate-100' : 'text-slate-800';
   const doneButtonClass = isDarkMode ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white';
+  const sectionBgClass = isDarkMode ? 'bg-slate-700/50' : 'bg-slate-100';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" aria-modal="true" role="dialog">
       <div className={`
         w-full max-w-md m-4 p-6 rounded-2xl shadow-2xl border
-        flex flex-col gap-8
+        flex flex-col gap-6
         transform transition-all duration-300 ease-in-out
         ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
         ${modalBgClass} ${modalTextClass}
@@ -82,6 +95,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, currentD
         </div>
 
         <div className="flex flex-col gap-2">
+          <h3 className="text-lg font-semibold mb-2">Gameplay</h3>
+          <div className={`flex justify-between items-center p-3 rounded-lg ${sectionBgClass}`}>
+            <label htmlFor="auto-notes-toggle" className="font-medium">
+              Auto Notes
+              <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Automatically fill notes at the start of a new game.
+              </p>
+            </label>
+            <button
+              id="auto-notes-toggle"
+              onClick={onToggleAutoNotes}
+              role="switch"
+              aria-checked={isAutoNotesEnabled}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isAutoNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isAutoNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
           <h3 className="text-lg font-semibold mb-2">Theme</h3>
           <div className="grid grid-cols-2 gap-3">
             {['Light', 'Dark'].map((theme) => {
@@ -112,7 +149,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, currentD
           </div>
         </div>
         
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-between items-center mt-2">
+           <button 
+            onClick={onFillBoard}
+            className={`text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+            aria-label="Fill board with solution"
+          >
+            I give up
+          </button>
+          
           <button
             onClick={handleDone}
             className={`font-bold py-2 px-6 rounded-lg shadow-md transition-colors ${doneButtonClass}`}

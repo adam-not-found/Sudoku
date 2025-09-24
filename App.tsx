@@ -82,6 +82,10 @@ const App: React.FC = () => {
     () => (localStorage.getItem('sudoku-difficulty') as Difficulty) || 'medium'
   );
 
+  const [isAutoNotesEnabled, setIsAutoNotesEnabled] = useState(
+    () => localStorage.getItem('sudoku-auto-notes') === 'true'
+  );
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('sudoku-dark-mode');
     if (savedMode) return savedMode === 'true';
@@ -92,6 +96,10 @@ const App: React.FC = () => {
     document.body.classList.toggle('dark', isDarkMode);
     localStorage.setItem('sudoku-dark-mode', String(isDarkMode));
   }, [isDarkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
+  }, [isAutoNotesEnabled]);
 
   // State for game statistics
   const [startTime, setStartTime] = useState(0);
@@ -132,6 +140,34 @@ const App: React.FC = () => {
         notes: new Set<number>(),
       }))
     );
+
+    if (isAutoNotesEnabled) {
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (newBoard[r][c].value === 0) {
+            const possibleNotes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            // Check row
+            for (let i = 0; i < 9; i++) {
+              if (newPuzzle[r][i] !== 0) possibleNotes.delete(newPuzzle[r][i]);
+            }
+            // Check column
+            for (let i = 0; i < 9; i++) {
+              if (newPuzzle[i][c] !== 0) possibleNotes.delete(newPuzzle[i][c]);
+            }
+            // Check 3x3 box
+            const boxStartRow = Math.floor(r / 3) * 3;
+            const boxStartCol = Math.floor(c / 3) * 3;
+            for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+              for (let j = boxStartCol; j < boxStartCol + 3; j++) {
+                if (newPuzzle[i][j] !== 0) possibleNotes.delete(newPuzzle[i][j]);
+              }
+            }
+            newBoard[r][c].notes = possibleNotes;
+          }
+        }
+      }
+    }
+
     setBoard(newBoard);
     setSelectedCell(null);
     setIsNotesMode(false);
@@ -146,7 +182,7 @@ const App: React.FC = () => {
     setEndTime(0);
     setMovesCount(0);
     setMistakesCount(0);
-  }, []);
+  }, [isAutoNotesEnabled]);
 
   useEffect(() => {
     // On first load, generate a board with the saved difficulty.
@@ -315,7 +351,7 @@ const App: React.FC = () => {
     }
   }, [board, hintsRemaining, selectedCell, isGameWon, solution, checkWinCondition, triggerWinState]);
 
-  const handleFillBoard = () => {
+  const handleFillBoard = useCallback(() => {
     if (solution.length === 0) return;
     const solvedBoard = solution.map(row =>
       row.map(value => ({
@@ -327,8 +363,16 @@ const App: React.FC = () => {
     );
     setBoard(solvedBoard);
     triggerWinState();
-  };
+  }, [solution, triggerWinState]);
 
+  const handleFillBoardAndCloseSettings = () => {
+    setIsSettingsOpen(false);
+    // Add a small delay to allow the modal to animate out before triggering the win state.
+    setTimeout(() => {
+      handleFillBoard();
+    }, 300); 
+  };
+  
   const handleCloseSettings = (newDifficulty: Difficulty) => {
     setIsSettingsOpen(false);
     if (newDifficulty !== difficulty) {
@@ -481,19 +525,15 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
-       <button 
-          onClick={handleFillBoard} 
-          className="absolute bottom-4 right-4 bg-sky-500 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-sky-600 transition-colors z-50 opacity-20 hover:opacity-100"
-          aria-label="Fill board to test victory screen"
-        >
-          Fill
-        </button>
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
         currentDifficulty={difficulty}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        onFillBoard={handleFillBoardAndCloseSettings}
+        isAutoNotesEnabled={isAutoNotesEnabled}
+        onToggleAutoNotes={() => setIsAutoNotesEnabled(prev => !prev)}
       />
     </div>
   );
