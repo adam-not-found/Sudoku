@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="180" rx="30" fill="#0ea5e9"/>
+  <g stroke="white">
+    <!-- Thin lines -->
+    <path stroke-width="1.5" d="M20,40 h140 M20,80 h140 M20,120 h140 M20,160 h140 M40,20 v140 M80,20 v140 M120,20 v140 M160,20 v140"/>
+    <!-- Thick lines -->
+    <path stroke-width="4" d="M20,60 h140 M20,140 h140 M60,20 v140 M140,20 v140"/>
+    <!-- Border -->
+    <rect x="20" y="20" width="140" height="140" fill="none" stroke-width="4"/>
+  </g>
+</svg>
