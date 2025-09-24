@@ -14,9 +14,11 @@ interface SudokuBoardProps {
   isNotesMode: boolean;
   isDarkMode: boolean;
   forceDarkMode?: boolean;
+  isAutoNotesEnabled: boolean;
+  highlightedNumber: number | null;
 }
 
-const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode }) => {
+const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, highlightedNumber }) => {
   
   const isDark = isDarkMode || forceDarkMode;
 
@@ -71,6 +73,8 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                     
                     const isCorrect = !cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex];
                     
+                    const isHighlighted = highlightedNumber !== null && cellData.value === highlightedNumber && !isSelected;
+
                     {/* Radius for corner cells. 4px outer - 1px gap = 3px inner. 
                         We use a smaller value (rounded-sm = 2px) to be safe.
                     */}
@@ -86,10 +90,12 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                         data={cellData}
                         isSelected={isSelected}
                         isPeer={isPeer && !isSelected}
+                        isHighlighted={isHighlighted}
                         isCorrect={isCorrect}
                         onClick={() => onCellClick(rowIndex, colIndex)}
                         isDarkMode={isDark}
                         className={cellCornerClass}
+                        isAutoNotesEnabled={isAutoNotesEnabled}
                       />
                     );
                   })}

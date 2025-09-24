@@ -64,6 +64,15 @@ const victoryMessages = [
   "All your boxes are belong to us.", // Zero Wing (Meme)
 ];
 
+const deepCopyBoard = (board: CellData[][]): CellData[][] => {
+  return board.map(row => 
+    row.map(cell => ({
+      ...cell,
+      userNotes: new Set(cell.userNotes),
+      autoNotes: new Set(cell.autoNotes),
+    }))
+  );
+};
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<CellData[][]>([]);
@@ -132,39 +141,34 @@ const App: React.FC = () => {
     setPuzzle(newPuzzle);
     setSolution(newSolution);
 
-    const newBoard = newPuzzle.map(row =>
+    let newBoard = newPuzzle.map(row =>
       row.map(value => ({
         value,
         isInitial: value !== 0,
         isWrong: false,
-        notes: new Set<number>(),
+        userNotes: new Set<number>(),
+        autoNotes: new Set<number>(),
       }))
     );
 
     if (isAutoNotesEnabled) {
+      const gridValues = newBoard.map(row => row.map(cell => cell.value));
       for (let r = 0; r < 9; r++) {
-        for (let c = 0; c < 9; c++) {
-          if (newBoard[r][c].value === 0) {
-            const possibleNotes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-            // Check row
-            for (let i = 0; i < 9; i++) {
-              if (newPuzzle[r][i] !== 0) possibleNotes.delete(newPuzzle[r][i]);
-            }
-            // Check column
-            for (let i = 0; i < 9; i++) {
-              if (newPuzzle[i][c] !== 0) possibleNotes.delete(newPuzzle[i][c]);
-            }
-            // Check 3x3 box
-            const boxStartRow = Math.floor(r / 3) * 3;
-            const boxStartCol = Math.floor(c / 3) * 3;
-            for (let i = boxStartRow; i < boxStartRow + 3; i++) {
-              for (let j = boxStartCol; j < boxStartCol + 3; j++) {
-                if (newPuzzle[i][j] !== 0) possibleNotes.delete(newPuzzle[i][j]);
+          for (let c = 0; c < 9; c++) {
+              if (newBoard[r][c].value === 0) {
+                  const possibleNotes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+                  for (let i = 0; i < 9; i++) { if (gridValues[r][i] !== 0) possibleNotes.delete(gridValues[r][i]); }
+                  for (let i = 0; i < 9; i++) { if (gridValues[i][c] !== 0) possibleNotes.delete(gridValues[i][c]); }
+                  const boxStartRow = Math.floor(r / 3) * 3;
+                  const boxStartCol = Math.floor(c / 3) * 3;
+                  for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+                      for (let j = boxStartCol; j < boxStartCol + 3; j++) {
+                          if (gridValues[i][j] !== 0) possibleNotes.delete(gridValues[i][j]);
+                      }
+                  }
+                  newBoard[r][c].autoNotes = possibleNotes;
               }
-            }
-            newBoard[r][c].notes = possibleNotes;
           }
-        }
       }
     }
 
@@ -213,25 +217,26 @@ const App: React.FC = () => {
     if (!selectedCell || isGameWon || solution.length === 0) return;
 
     const { row, col } = selectedCell;
-    const currentBoard = board.map(r => r.map(c => ({...c, notes: new Set(c.notes)}))); // Deep copy
+    const currentBoard = deepCopyBoard(board);
     
     const cell = currentBoard[row][col];
     if (cell.isInitial) return;
 
-    setHistory(prev => [...prev, board]); // Save current state for undo
-    setRedoHistory([]); // Clear redo history on a new move
+    setHistory(prev => [...prev, board]);
+    setRedoHistory([]);
 
     if (isNotesMode) {
-      if (cell.notes.has(num)) {
-        cell.notes.delete(num);
+      if (cell.userNotes.has(num)) {
+        cell.userNotes.delete(num);
       } else {
-        cell.notes.add(num);
+        cell.userNotes.add(num);
       }
-      cell.value = 0; // Clear main value if entering notes
+      cell.value = 0;
     } else {
       setMovesCount(prev => prev + 1);
       cell.value = num;
-      cell.notes.clear(); // Clear notes when setting a value
+      cell.userNotes.clear();
+      cell.autoNotes.clear();
       const isCorrect = solution[row][col] === num;
       cell.isWrong = !isCorrect;
       
@@ -242,16 +247,19 @@ const App: React.FC = () => {
       if (isCorrect) {
         // Auto-remove this number from notes in the same row, col, and box
         for (let c = 0; c < 9; c++) {
-          currentBoard[row][c].notes.delete(num);
+          currentBoard[row][c].userNotes.delete(num);
+          currentBoard[row][c].autoNotes.delete(num);
         }
         for (let r = 0; r < 9; r++) {
-          currentBoard[r][col].notes.delete(num);
+          currentBoard[r][col].userNotes.delete(num);
+          currentBoard[r][col].autoNotes.delete(num);
         }
         const boxStartRow = Math.floor(row / 3) * 3;
         const boxStartCol = Math.floor(col / 3) * 3;
         for (let r = boxStartRow; r < boxStartRow + 3; r++) {
           for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-            currentBoard[r][c].notes.delete(num);
+            currentBoard[r][c].userNotes.delete(num);
+            currentBoard[r][c].autoNotes.delete(num);
           }
         }
         
@@ -292,18 +300,18 @@ const App: React.FC = () => {
 
     if (cellToDelete.isInitial) return;
 
-    // Only proceed if there is a value or notes to delete.
-    if (cellToDelete.value === 0 && cellToDelete.notes.size === 0) {
+    if (cellToDelete.value === 0 && cellToDelete.userNotes.size === 0 && cellToDelete.autoNotes.size === 0) {
       return;
     }
 
     setHistory(prev => [...prev, board]);
     setRedoHistory([]);
 
-    const newBoard = board.map(r => r.map(c => ({...c, notes: new Set(c.notes)})));
+    const newBoard = deepCopyBoard(board);
     const cell = newBoard[row][col];
     cell.value = 0;
-    cell.notes.clear();
+    cell.userNotes.clear();
+    cell.autoNotes.clear();
     cell.isWrong = false;
     setBoard(newBoard);
   }, [board, selectedCell, isGameWon]);
@@ -319,32 +327,40 @@ const App: React.FC = () => {
     }
 
     setHistory(prev => [...prev, board]);
-    setRedoHistory([]); // Clear redo history on a new move
+    setRedoHistory([]);
 
     const correctValue = solution[row][col];
-    const newBoard = board.map(r => r.map(c => ({...c, notes: new Set(c.notes)})));
+    const newBoard = deepCopyBoard(board);
 
     newBoard[row][col] = {
       value: correctValue,
       isInitial: false,
       isWrong: false,
-      notes: new Set(),
+      userNotes: new Set(),
+      autoNotes: new Set(),
     };
 
     // Auto-remove this number from notes in the same row, col, and box
-    for (let c = 0; c < 9; c++) { newBoard[row][c].notes.delete(correctValue); }
-    for (let r = 0; r < 9; r++) { newBoard[r][col].notes.delete(correctValue); }
+    for (let c = 0; c < 9; c++) { 
+        newBoard[row][c].userNotes.delete(correctValue);
+        newBoard[row][c].autoNotes.delete(correctValue);
+     }
+    for (let r = 0; r < 9; r++) { 
+        newBoard[r][col].userNotes.delete(correctValue);
+        newBoard[r][col].autoNotes.delete(correctValue);
+    }
     const boxStartRow = Math.floor(row / 3) * 3;
     const boxStartCol = Math.floor(col / 3) * 3;
     for (let r = boxStartRow; r < boxStartRow + 3; r++) {
       for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-        newBoard[r][c].notes.delete(correctValue);
+        newBoard[r][c].userNotes.delete(correctValue);
+        newBoard[r][c].autoNotes.delete(correctValue);
       }
     }
 
     setBoard(newBoard);
     setHintsRemaining(prev => prev - 1);
-    setSelectedCell(null); // Deselect the cell after giving a hint.
+    setSelectedCell(null);
     
     if (checkWinCondition(newBoard)) {
       triggerWinState();
@@ -358,7 +374,8 @@ const App: React.FC = () => {
         value,
         isInitial: false,
         isWrong: false,
-        notes: new Set<number>(),
+        userNotes: new Set<number>(),
+        autoNotes: new Set<number>(),
       }))
     );
     setBoard(solvedBoard);
@@ -367,7 +384,6 @@ const App: React.FC = () => {
 
   const handleFillBoardAndCloseSettings = () => {
     setIsSettingsOpen(false);
-    // Add a small delay to allow the modal to animate out before triggering the win state.
     setTimeout(() => {
       handleFillBoard();
     }, 300); 
@@ -381,6 +397,46 @@ const App: React.FC = () => {
       startNewGame(newDifficulty);
     }
   };
+
+  const handleSetAutoNotes = (enabled: boolean) => {
+    setIsAutoNotesEnabled(enabled); // Update preference for future games
+
+    const newBoard = deepCopyBoard(board);
+
+    if (enabled) {
+      // Calculate and apply auto notes to the current board state
+      const gridValues = newBoard.map(row => row.map(cell => cell.value));
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (newBoard[r][c].value === 0) {
+            const possibleNotes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            for (let i = 0; i < 9; i++) { if (gridValues[r][i] !== 0) possibleNotes.delete(gridValues[r][i]); }
+            for (let i = 0; i < 9; i++) { if (gridValues[i][c] !== 0) possibleNotes.delete(gridValues[i][c]); }
+            const boxStartRow = Math.floor(r / 3) * 3;
+            const boxStartCol = Math.floor(c / 3) * 3;
+            for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+              for (let j = boxStartCol; j < boxStartCol + 3; j++) {
+                if (gridValues[i][j] !== 0) possibleNotes.delete(gridValues[i][j]);
+              }
+            }
+            newBoard[r][c].autoNotes = possibleNotes;
+          }
+        }
+      }
+    } else {
+      // Clear all auto notes from the current board
+      newBoard.forEach(row => {
+        row.forEach(cell => {
+          cell.autoNotes.clear();
+        });
+      });
+    }
+
+    setHistory(prev => [...prev, board]);
+    setRedoHistory([]);
+    setBoard(newBoard);
+  };
+
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -450,6 +506,10 @@ const App: React.FC = () => {
   const elapsedTime = endTime > 0 ? endTime - startTime : 0;
   const hintsUsed = 3 - hintsRemaining;
 
+  const highlightedNumber = selectedCell && board[selectedCell.row][selectedCell.col].value > 0
+    ? board[selectedCell.row][selectedCell.col].value
+    : null;
+
   return (
     <div className={`min-h-screen font-sans relative`}>
        <Header 
@@ -476,6 +536,8 @@ const App: React.FC = () => {
               isNotesMode={isNotesMode}
               isDarkMode={isDarkMode}
               forceDarkMode={isGameWon}
+              isAutoNotesEnabled={isAutoNotesEnabled}
+              highlightedNumber={highlightedNumber}
             />
           </div>
           <div className="mt-6 w-full max-w-lg flex flex-col items-center gap-4">
@@ -533,7 +595,7 @@ const App: React.FC = () => {
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
         onFillBoard={handleFillBoardAndCloseSettings}
         isAutoNotesEnabled={isAutoNotesEnabled}
-        onToggleAutoNotes={() => setIsAutoNotesEnabled(prev => !prev)}
+        onSetAutoNotes={handleSetAutoNotes}
       />
     </div>
   );
