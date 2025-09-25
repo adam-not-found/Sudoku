@@ -70,9 +70,11 @@ const deepCopyBoard = (board: CellData[][]): CellData[][] => {
       ...cell,
       userNotes: new Set(cell.userNotes),
       autoNotes: new Set(cell.autoNotes),
+      eliminatedNotes: new Set(cell.eliminatedNotes),
     }))
   );
 };
+
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<CellData[][]>([]);
@@ -105,6 +107,11 @@ const App: React.FC = () => {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   });
 
+  // State for hint visuals and logic
+  const [hintTargetCell, setHintTargetCell] = useState<{row: number, col: number} | null>(null);
+  const [activeHint, setActiveHint] = useState<{row: number, col: number, level: number} | null>(null);
+
+
   useEffect(() => {
     document.body.classList.toggle('dark', isDarkMode);
     localStorage.setItem('sudoku-dark-mode', String(isDarkMode));
@@ -123,6 +130,20 @@ const App: React.FC = () => {
   const [endTime, setEndTime] = useState(0);
   const [movesCount, setMovesCount] = useState(0);
   const [mistakesCount, setMistakesCount] = useState(0);
+  
+  const clearProgressiveHint = useCallback(() => {
+    setActiveHint(null);
+  }, []);
+
+  const clearHintHighlights = useCallback(() => {
+    setHintTargetCell(null);
+  }, []);
+
+  const clearAllHintEffects = useCallback(() => {
+    clearHintHighlights();
+    clearProgressiveHint();
+  }, [clearHintHighlights, clearProgressiveHint]);
+
 
   const triggerWinState = useCallback(() => {
     const randomMessage = victoryMessages[Math.floor(Math.random() * victoryMessages.length)];
@@ -130,7 +151,8 @@ const App: React.FC = () => {
     setIsGameWon(true);
     setEndTime(Date.now());
     setSelectedCell(null);
-  }, []);
+    clearAllHintEffects();
+  }, [clearAllHintEffects]);
 
   const checkWinCondition = useCallback((currentBoard: CellData[][]) => {
     if (solution.length === 0) return false;
@@ -144,6 +166,23 @@ const App: React.FC = () => {
     return true;
   }, [solution]);
   
+  const getCandidates = (currentBoard: CellData[][], row: number, col: number): Set<number> => {
+      const candidates = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      const gridValues = currentBoard.map(r => r.map(c => c.value));
+      for (let i = 0; i < 9; i++) {
+          if (gridValues[row][i] !== 0) candidates.delete(gridValues[row][i]);
+          if (gridValues[i][col] !== 0) candidates.delete(gridValues[i][col]);
+      }
+      const boxStartRow = Math.floor(row / 3) * 3;
+      const boxStartCol = Math.floor(col / 3) * 3;
+      for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+          for (let j = boxStartCol; j < boxStartCol + 3; j++) {
+              if (gridValues[i][j] !== 0) candidates.delete(gridValues[i][j]);
+          }
+      }
+      return candidates;
+  };
+
   const startNewGame = useCallback((gameDifficulty: Difficulty) => {
     const { puzzle: newPuzzle, solution: newSolution } = generateSudoku(gameDifficulty);
     setPuzzle(newPuzzle);
@@ -156,25 +195,15 @@ const App: React.FC = () => {
         isWrong: false,
         userNotes: new Set<number>(),
         autoNotes: new Set<number>(),
+        eliminatedNotes: new Set<number>(),
       }))
     );
 
     if (isAutoNotesEnabled) {
-      const gridValues = newBoard.map(row => row.map(cell => cell.value));
       for (let r = 0; r < 9; r++) {
           for (let c = 0; c < 9; c++) {
               if (newBoard[r][c].value === 0) {
-                  const possibleNotes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-                  for (let i = 0; i < 9; i++) { if (gridValues[r][i] !== 0) possibleNotes.delete(gridValues[r][i]); }
-                  for (let i = 0; i < 9; i++) { if (gridValues[i][c] !== 0) possibleNotes.delete(gridValues[i][c]); }
-                  const boxStartRow = Math.floor(r / 3) * 3;
-                  const boxStartCol = Math.floor(c / 3) * 3;
-                  for (let i = boxStartRow; i < boxStartRow + 3; i++) {
-                      for (let j = boxStartCol; j < boxStartCol + 3; j++) {
-                          if (gridValues[i][j] !== 0) possibleNotes.delete(gridValues[i][j]);
-                      }
-                  }
-                  newBoard[r][c].autoNotes = possibleNotes;
+                  newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
               }
           }
       }
@@ -188,17 +217,16 @@ const App: React.FC = () => {
     setHintsRemaining(3);
     setIsGameWon(false);
     setAnimationState('idle');
+    clearAllHintEffects();
 
     // Reset stats for new game
     setStartTime(Date.now());
     setEndTime(0);
     setMovesCount(0);
     setMistakesCount(0);
-  }, [isAutoNotesEnabled]);
+  }, [isAutoNotesEnabled, clearAllHintEffects]);
 
   useEffect(() => {
-    // On first load, generate a board with the saved difficulty.
-    // This runs only once on mount.
     startNewGame(difficulty);
   }, []);
   
@@ -207,7 +235,7 @@ const App: React.FC = () => {
       setAnimationState('playing');
       const timer = setTimeout(() => {
         setAnimationState('finished');
-      }, 1500); // Animation duration
+      }, 1500);
 
       return () => {
         clearTimeout(timer);
@@ -218,71 +246,99 @@ const App: React.FC = () => {
 
   const handleCellClick = (row: number, col: number) => {
     if (isGameWon) return;
-    setSelectedCell({ row, col });
+    if (selectedCell?.row === row && selectedCell?.col === col) {
+      setSelectedCell(null);
+    } else {
+      setSelectedCell({ row, col });
+    }
+    clearAllHintEffects();
   };
 
-  const handleNumberClick = useCallback((num: number) => {
+  const handleNumberClick = useCallback((num: number, isFromHint: boolean = false) => {
     if (!selectedCell || isGameWon || solution.length === 0) return;
 
     const { row, col } = selectedCell;
-    const currentBoard = deepCopyBoard(board);
-    
-    const cell = currentBoard[row][col];
-    if (cell.isInitial) return;
+    const cellData = board[row][col];
+    if (cellData.isInitial) return;
 
-    setHistory(prev => [...prev, board]);
-    setRedoHistory([]);
-
-    if (isNotesMode) {
-      if (cell.userNotes.has(num)) {
-        cell.userNotes.delete(num);
-      } else {
-        cell.userNotes.add(num);
-      }
-      cell.value = 0;
-    } else {
-      setMovesCount(prev => prev + 1);
-      cell.value = num;
-      cell.userNotes.clear();
-      cell.autoNotes.clear();
-      const isCorrect = solution[row][col] === num;
-      cell.isWrong = !isCorrect;
-      
-      if (!isCorrect) {
-        setMistakesCount(prev => prev + 1);
-      }
-      
-      if (isCorrect) {
-        // Auto-remove this number from notes in the same row, col, and box
-        for (let c = 0; c < 9; c++) {
-          currentBoard[row][c].userNotes.delete(num);
-          currentBoard[row][c].autoNotes.delete(num);
-        }
-        for (let r = 0; r < 9; r++) {
-          currentBoard[r][col].userNotes.delete(num);
-          currentBoard[r][col].autoNotes.delete(num);
-        }
-        const boxStartRow = Math.floor(row / 3) * 3;
-        const boxStartCol = Math.floor(col / 3) * 3;
-        for (let r = boxStartRow; r < boxStartRow + 3; r++) {
-          for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-            currentBoard[r][c].userNotes.delete(num);
-            currentBoard[r][c].autoNotes.delete(num);
-          }
+    if (isNotesMode && !isFromHint) {
+        if (cellData.eliminatedNotes.has(num)) {
+            return; // Cannot interact with red "eliminated" notes
         }
         
-        if (checkWinCondition(currentBoard)) {
-          triggerWinState();
+        const willChange = !cellData.eliminatedNotes.has(num);
+        if (!willChange) return;
+
+        setHistory(prev => [...prev, board]);
+        setRedoHistory([]);
+        clearAllHintEffects();
+        
+        const newBoard = deepCopyBoard(board);
+        const cell = newBoard[row][col];
+
+        const isAdding = !cell.userNotes.has(num) && !cell.autoNotes.has(num);
+        if (isAdding) {
+            cell.userNotes.add(num);
+        } else {
+            cell.userNotes.delete(num);
+            cell.autoNotes.delete(num);
         }
-      }
+        cell.value = 0;
+        setBoard(newBoard);
+    } else {
+        setHistory(prev => [...prev, board]);
+        setRedoHistory([]);
+        clearAllHintEffects();
+
+        const newBoard = deepCopyBoard(board);
+        const cell = newBoard[row][col];
+        
+        if (!isFromHint) {
+            setMovesCount(prev => prev + 1);
+        }
+        cell.value = num;
+        cell.userNotes.clear();
+        cell.autoNotes.clear();
+        cell.eliminatedNotes.clear();
+        
+        const isCorrect = solution[row][col] === num;
+        cell.isWrong = !isCorrect;
+        
+        if (!isCorrect && !isFromHint) {
+            setMistakesCount(prev => prev + 1);
+        }
+        
+        if (isCorrect) {
+            for (let c = 0; c < 9; c++) {
+                newBoard[row][c].userNotes.delete(num);
+                newBoard[row][c].autoNotes.delete(num);
+            }
+            for (let r = 0; r < 9; r++) {
+                newBoard[r][col].userNotes.delete(num);
+                newBoard[r][col].autoNotes.delete(num);
+            }
+            const boxStartRow = Math.floor(row / 3) * 3;
+            const boxStartCol = Math.floor(col / 3) * 3;
+            for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+                for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                    newBoard[r][c].userNotes.delete(num);
+                    newBoard[r][c].autoNotes.delete(num);
+                }
+            }
+            
+            if (checkWinCondition(newBoard)) {
+                triggerWinState();
+            }
+        }
+        setBoard(newBoard);
     }
-    setBoard(currentBoard);
-  }, [board, isNotesMode, selectedCell, isGameWon, solution, checkWinCondition, triggerWinState]);
+  }, [board, isNotesMode, selectedCell, isGameWon, solution, checkWinCondition, triggerWinState, clearAllHintEffects]);
   
   const handleToggleNotesMode = useCallback(() => {
     if (isGameWon) return;
     setIsNotesMode(prev => !prev);
-  }, [isGameWon]);
+    clearAllHintEffects();
+  }, [isGameWon, clearAllHintEffects]);
 
   const handleUndo = useCallback(() => {
     if (history.length === 0 || isGameWon) return;
@@ -290,7 +346,8 @@ const App: React.FC = () => {
     setRedoHistory(prev => [...prev, board]);
     setBoard(lastState);
     setHistory(history.slice(0, -1));
-  }, [board, history, isGameWon]);
+    clearAllHintEffects();
+  }, [board, history, isGameWon, clearAllHintEffects]);
 
   const handleRedo = useCallback(() => {
     if (redoHistory.length === 0 || isGameWon) return;
@@ -298,7 +355,8 @@ const App: React.FC = () => {
     setHistory(prev => [...prev, board]);
     setBoard(nextState);
     setRedoHistory(redoHistory.slice(0, -1));
-  }, [board, redoHistory, isGameWon]);
+    clearAllHintEffects();
+  }, [board, redoHistory, isGameWon, clearAllHintEffects]);
 
   const handleDelete = useCallback(() => {
     if (!selectedCell || isGameWon) return;
@@ -308,72 +366,145 @@ const App: React.FC = () => {
 
     if (cellToDelete.isInitial) return;
 
-    if (cellToDelete.value === 0 && cellToDelete.userNotes.size === 0 && cellToDelete.autoNotes.size === 0) {
+    if (cellToDelete.value === 0 && cellToDelete.userNotes.size === 0 && cellToDelete.autoNotes.size === 0 && cellToDelete.eliminatedNotes.size === 0) {
       return;
     }
 
     setHistory(prev => [...prev, board]);
     setRedoHistory([]);
+    clearAllHintEffects();
 
     const newBoard = deepCopyBoard(board);
     const cell = newBoard[row][col];
     cell.value = 0;
     cell.userNotes.clear();
     cell.autoNotes.clear();
+    cell.eliminatedNotes.clear();
     cell.isWrong = false;
     setBoard(newBoard);
-  }, [board, selectedCell, isGameWon]);
+  }, [board, selectedCell, isGameWon, clearAllHintEffects]);
+
 
   const handleHint = useCallback(() => {
-    if (!selectedCell || hintsRemaining <= 0 || isGameWon || solution.length === 0) return;
+    if (hintsRemaining <= 0 || isGameWon || solution.length === 0) return;
 
-    const { row, col } = selectedCell;
-    const cell = board[row][col];
-    
-    if (cell.isInitial || (cell.value !== 0 && cell.value === solution[row][col])) {
-      return;
+    clearHintHighlights();
+
+    const isHintableCellSelected = selectedCell && !board[selectedCell.row][selectedCell.col].isInitial && board[selectedCell.row][selectedCell.col].value === 0;
+
+    // Case 1: A valid cell is selected -> Progressive Hint
+    if (isHintableCellSelected) {
+        const { row, col } = selectedCell;
+        let nextLevel = 1;
+
+        if (activeHint && activeHint.row === row && activeHint.col === col) {
+            nextLevel = activeHint.level + 1;
+        } else {
+            setHintsRemaining(prev => prev - 1);
+        }
+
+        setActiveHint({ row, col, level: nextLevel });
+
+        switch (nextLevel) {
+            case 1: { // Candidate Elimination
+                clearHintHighlights();
+                const correctAnswer = solution[row][col];
+                const cellForNotes = board[row][col];
+                const existingNotes = cellForNotes.userNotes.size > 0 ? cellForNotes.userNotes : cellForNotes.autoNotes;
+
+                let incorrectNotesToShow: number[] = [];
+
+                if (existingNotes.size > 0) {
+                    const incorrectNotesInCell = Array.from(existingNotes).filter(n => n !== correctAnswer);
+                    const shuffled = incorrectNotesInCell.sort(() => 0.5 - Math.random());
+                    const countToHighlight = Math.max(1, Math.ceil(shuffled.length / 2));
+                    incorrectNotesToShow = shuffled.slice(0, countToHighlight);
+                } else {
+                    const candidates = getCandidates(board, row, col);
+                    candidates.delete(correctAnswer);
+                    incorrectNotesToShow = Array.from(candidates).slice(0, 3);
+                }
+                
+                const newBoard = deepCopyBoard(board);
+                const cellToUpdate = newBoard[row][col];
+                
+                incorrectNotesToShow.forEach(num => {
+                    cellToUpdate.eliminatedNotes.add(num);
+                    cellToUpdate.userNotes.delete(num);
+                    cellToUpdate.autoNotes.delete(num);
+                });
+                
+                setHistory(prev => [...prev, board]);
+                setRedoHistory([]);
+                setBoard(newBoard);
+                return;
+            }
+            
+            case 2: // The Answer
+            default:
+                handleNumberClick(solution[row][col], true);
+                clearAllHintEffects();
+                setActiveHint(null);
+                return;
+        }
     }
 
-    setHistory(prev => [...prev, board]);
-    setRedoHistory([]);
 
-    const correctValue = solution[row][col];
-    const newBoard = deepCopyBoard(board);
+    // Case 2: No cell selected or cell not hintable -> "Smart Nudge"
+    let candidateCells: { row: number; col: number }[] = [];
+    let minCandidates = 10;
+    const gridValues = board.map(row => row.map(cell => cell.value));
 
-    newBoard[row][col] = {
-      value: correctValue,
-      isInitial: false,
-      isWrong: false,
-      userNotes: new Set(),
-      autoNotes: new Set(),
-    };
-
-    // Auto-remove this number from notes in the same row, col, and box
-    for (let c = 0; c < 9; c++) { 
-        newBoard[row][c].userNotes.delete(correctValue);
-        newBoard[row][c].autoNotes.delete(correctValue);
-     }
-    for (let r = 0; r < 9; r++) { 
-        newBoard[r][col].userNotes.delete(correctValue);
-        newBoard[r][col].autoNotes.delete(correctValue);
-    }
-    const boxStartRow = Math.floor(row / 3) * 3;
-    const boxStartCol = Math.floor(col / 3) * 3;
-    for (let r = boxStartRow; r < boxStartRow + 3; r++) {
-      for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-        newBoard[r][c].userNotes.delete(correctValue);
-        newBoard[r][c].autoNotes.delete(correctValue);
-      }
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (gridValues[r][c] === 0) {
+                const candidates = getCandidates(board, r, c);
+                if (candidates.size > 0) {
+                    if (candidates.size < minCandidates) {
+                        minCandidates = candidates.size;
+                        candidateCells = [{ row: r, col: c }];
+                    } else if (candidates.size === minCandidates) {
+                        candidateCells.push({ row: r, col: c });
+                    }
+                }
+            }
+        }
     }
 
-    setBoard(newBoard);
-    setHintsRemaining(prev => prev - 1);
-    setSelectedCell(null);
-    
-    if (checkWinCondition(newBoard)) {
-      triggerWinState();
+    let bestCell: { row: number; col: number } | null = null;
+    if (candidateCells.length === 1) {
+        bestCell = candidateCells[0];
+    } else if (candidateCells.length > 1) {
+        let maxScore = -1;
+        for (const cell of candidateCells) {
+            let score = 0;
+            const { row, col } = cell;
+            for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
+            for (let i = 0; i < 9; i++) { if (gridValues[i][col] !== 0) score++; }
+            const boxStartRow = Math.floor(row / 3) * 3;
+            const boxStartCol = Math.floor(col / 3) * 3;
+            for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+                for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                    if (gridValues[r][c] !== 0) score++;
+                }
+            }
+            if (score > maxScore) {
+                maxScore = score;
+                bestCell = cell;
+            }
+        }
     }
-  }, [board, hintsRemaining, selectedCell, isGameWon, solution, checkWinCondition, triggerWinState]);
+
+    if (bestCell) {
+        setHintTargetCell(bestCell);
+        if (!isHintableCellSelected) {
+             setHintsRemaining(prev => prev - 1);
+        }
+        setActiveHint(null);
+        setTimeout(clearHintHighlights, 2000);
+    }
+}, [board, hintsRemaining, selectedCell, isGameWon, solution, activeHint, handleNumberClick, clearHintHighlights, clearAllHintEffects]);
+
 
   const handleFillBoard = useCallback(() => {
     if (solution.length === 0) return;
@@ -384,6 +515,7 @@ const App: React.FC = () => {
         isWrong: false,
         userNotes: new Set<number>(),
         autoNotes: new Set<number>(),
+        eliminatedNotes: new Set<number>(),
       }))
     );
     setBoard(solvedBoard);
@@ -407,37 +539,22 @@ const App: React.FC = () => {
   };
 
   const handleSetAutoNotes = (enabled: boolean) => {
-    setIsAutoNotesEnabled(enabled); // Update preference for future games
+    setIsAutoNotesEnabled(enabled);
 
     const newBoard = deepCopyBoard(board);
 
     if (enabled) {
-      // Calculate and apply auto notes to the current board state
-      const gridValues = newBoard.map(row => row.map(cell => cell.value));
       for (let r = 0; r < 9; r++) {
         for (let c = 0; c < 9; c++) {
-          if (newBoard[r][c].value === 0) {
-            const possibleNotes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-            for (let i = 0; i < 9; i++) { if (gridValues[r][i] !== 0) possibleNotes.delete(gridValues[r][i]); }
-            for (let i = 0; i < 9; i++) { if (gridValues[i][c] !== 0) possibleNotes.delete(gridValues[i][c]); }
-            const boxStartRow = Math.floor(r / 3) * 3;
-            const boxStartCol = Math.floor(c / 3) * 3;
-            for (let i = boxStartRow; i < boxStartRow + 3; i++) {
-              for (let j = boxStartCol; j < boxStartCol + 3; j++) {
-                if (gridValues[i][j] !== 0) possibleNotes.delete(gridValues[i][j]);
-              }
-            }
-            newBoard[r][c].autoNotes = possibleNotes;
+          if (newBoard[r][c].value === 0 && newBoard[r][c].userNotes.size === 0) {
+            newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
+          } else {
+            newBoard[r][c].autoNotes.clear();
           }
         }
       }
     } else {
-      // Clear all auto notes from the current board
-      newBoard.forEach(row => {
-        row.forEach(cell => {
-          cell.autoNotes.clear();
-        });
-      });
+      newBoard.forEach(row => row.forEach(cell => cell.autoNotes.clear()));
     }
 
     setHistory(prev => [...prev, board]);
@@ -449,6 +566,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isGameWon || isSettingsOpen) return;
+      clearAllHintEffects();
 
       if (!selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         setSelectedCell({ row: 0, col: 0 });
@@ -482,6 +600,10 @@ const App: React.FC = () => {
           handleDelete();
           event.preventDefault();
           break;
+        case 'Escape':
+          setSelectedCell(null);
+          event.preventDefault();
+          break;
         default:
           const num = parseInt(event.key, 10);
           if (!isNaN(num) && num >= 1 && num <= 9) {
@@ -495,7 +617,7 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen]);
+  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen, clearAllHintEffects]);
 
   if (board.length === 0 || solution.length === 0) {
     return <div className="flex items-center justify-center min-h-screen">Generating Puzzle...</div>;
@@ -519,13 +641,14 @@ const App: React.FC = () => {
     : null;
 
   return (
-    <div className={`min-h-screen font-sans relative`}>
+    <div className={`min-h-screen font-sans relative`} onClick={() => setSelectedCell(null)}>
        <Header 
           isDarkMode={isDarkMode} 
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onNewGame={() => startNewGame(difficulty)}
         />
       <div className={`min-h-screen flex items-center justify-center pt-24 pb-4 px-4`}>
-        <main className={`w-full max-w-lg flex flex-col items-center transition-all duration-300 ${isSettingsOpen ? 'blur-sm pointer-events-none' : ''}`}>
+        <main className={`w-full max-w-lg flex flex-col items-center transition-all duration-300 ${isSettingsOpen ? 'blur-sm pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
           <div className="relative w-full">
             {animationState !== 'idle' && (
               <VictoryScreen 
@@ -547,6 +670,7 @@ const App: React.FC = () => {
               isAutoNotesEnabled={isAutoNotesEnabled}
               isHighlightNotesEnabled={isHighlightNotesEnabled}
               highlightedNumber={highlightedNumber}
+              hintTargetCell={hintTargetCell}
             />
           </div>
           <div className="mt-6 w-full max-w-lg flex flex-col items-center gap-4">
@@ -569,7 +693,6 @@ const App: React.FC = () => {
                               canRedo={redoHistory.length > 0}
                               onHint={handleHint}
                               hintsRemaining={hintsRemaining}
-                              isCellMutable={isCellMutable}
                               onDelete={handleDelete}
                               isDarkMode={isDarkMode}
                           />

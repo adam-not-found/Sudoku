@@ -15,7 +15,6 @@ interface ControlsProps {
   canRedo: boolean;
   onHint: () => void;
   hintsRemaining: number;
-  isCellMutable: boolean;
   onDelete: () => void;
   isDarkMode: boolean;
 }
@@ -29,7 +28,6 @@ const Controls: React.FC<ControlsProps> = ({
   canRedo, 
   onHint, 
   hintsRemaining, 
-  isCellMutable,
   onDelete,
   isDarkMode
 }) => {
@@ -54,8 +52,7 @@ const Controls: React.FC<ControlsProps> = ({
     ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' 
     : iconButtonClasses;
 
-  const hintButtonDisabled = hintsRemaining <= 0 || !isCellMutable;
-  const deleteButtonDisabled = !isCellMutable;
+  const hintButtonDisabled = hintsRemaining <= 0;
 
   const hintHoverClass = hintButtonDisabled ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
 
@@ -81,7 +78,6 @@ const Controls: React.FC<ControlsProps> = ({
       </div>
       <button 
         onClick={onDelete}
-        disabled={deleteButtonDisabled}
         className={`${baseButtonClasses} ${iconButtonClasses}`}
         aria-label="Delete number or notes"
       >

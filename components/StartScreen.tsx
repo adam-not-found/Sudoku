@@ -17,9 +17,10 @@ interface SudokuBoardProps {
   isAutoNotesEnabled: boolean;
   isHighlightNotesEnabled: boolean;
   highlightedNumber: number | null;
+  hintTargetCell: { row: number, col: number } | null;
 }
 
-const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber }) => {
+const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell }) => {
   
   const isDark = isDarkMode || forceDarkMode;
 
@@ -63,6 +64,7 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                     const cellCol = cellInBoxIndex % 3;
 
                     const rowIndex = boxRowStart + cellRow;
+                    // FIX: Corrected typo from `boxStartCol` to `boxColStart`.
                     const colIndex = boxColStart + cellCol;
                     
                     const cellData = board[rowIndex][colIndex];
@@ -84,6 +86,8 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                       isHighlighted = isHighlightedByValue || isHighlightedByNote;
                     }
 
+                    const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
+                    
                     {/* Radius for corner cells. 4px outer - 1px gap = 3px inner. 
                         We use a smaller value (rounded-sm = 2px) to be safe.
                     */}
@@ -106,6 +110,7 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                         className={cellCornerClass}
                         isAutoNotesEnabled={isAutoNotesEnabled}
                         highlightedNumber={highlightedNumber}
+                        isHintTarget={isHintTarget}
                       />
                     );
                   })}
