@@ -15,6 +15,8 @@ interface SettingsPanelProps {
   onFillBoard: () => void;
   isAutoNotesEnabled: boolean;
   onSetAutoNotes: (enabled: boolean) => void;
+  isHighlightNotesEnabled: boolean;
+  onSetHighlightNotes: (enabled: boolean) => void;
 }
 
 const difficulties: { id: Difficulty; label: string }[] = [
@@ -33,6 +35,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onFillBoard,
   isAutoNotesEnabled,
   onSetAutoNotes,
+  isHighlightNotesEnabled,
+  onSetHighlightNotes,
 }) => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(currentDifficulty);
 
@@ -49,11 +53,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleDone = () => {
     onClose(selectedDifficulty);
   };
-  
-  const handleToggleClick = () => {
-    onSetAutoNotes(!isAutoNotesEnabled);
-  };
-
 
   const modalBgClass = isDarkMode ? 'bg-slate-800/90 border-slate-600 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm';
   const modalTextClass = isDarkMode ? 'text-slate-100' : 'text-slate-800';
@@ -100,9 +99,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div className="flex flex-col gap-2">
           <h3 className="text-lg font-semibold mb-2">Gameplay</h3>
-          <div className={`p-3 rounded-lg ${sectionBgClass}`}>
+          <div className={`p-4 rounded-lg ${sectionBgClass} flex flex-col gap-4`}>
             <div className="flex justify-between items-center">
-              <label htmlFor="auto-notes-toggle" className="font-medium">
+              <label htmlFor="auto-notes-toggle" className="font-medium pr-4">
                 Auto Notes
                 <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Show all possible notes for empty cells.
@@ -110,7 +109,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </label>
               <button
                 id="auto-notes-toggle"
-                onClick={handleToggleClick}
+                onClick={() => onSetAutoNotes(!isAutoNotesEnabled)}
                 role="switch"
                 aria-checked={isAutoNotesEnabled}
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isAutoNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
@@ -118,6 +117,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <span
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isAutoNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
+            </div>
+            <div className="flex justify-between items-center">
+              <label htmlFor="highlight-notes-toggle" className="font-medium pr-4">
+                Highlight Notes
+                <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Also highlight notes matching the selected number.
+                </p>
+              </label>
+              <button
+                id="highlight-notes-toggle"
+                onClick={() => onSetHighlightNotes(!isHighlightNotesEnabled)}
+                role="switch"
+                aria-checked={isHighlightNotesEnabled}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isHighlightNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isHighlightNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                 />
               </button>
             </div>

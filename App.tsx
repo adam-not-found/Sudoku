@@ -95,6 +95,10 @@ const App: React.FC = () => {
     () => localStorage.getItem('sudoku-auto-notes') === 'true'
   );
 
+  const [isHighlightNotesEnabled, setIsHighlightNotesEnabled] = useState(
+    () => localStorage.getItem('sudoku-highlight-notes') === 'true'
+  );
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('sudoku-dark-mode');
     if (savedMode) return savedMode === 'true';
@@ -109,6 +113,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
   }, [isAutoNotesEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
+  }, [isHighlightNotesEnabled]);
 
   // State for game statistics
   const [startTime, setStartTime] = useState(0);
@@ -537,6 +545,7 @@ const App: React.FC = () => {
               isDarkMode={isDarkMode}
               forceDarkMode={isGameWon}
               isAutoNotesEnabled={isAutoNotesEnabled}
+              isHighlightNotesEnabled={isHighlightNotesEnabled}
               highlightedNumber={highlightedNumber}
             />
           </div>
@@ -596,6 +605,8 @@ const App: React.FC = () => {
         onFillBoard={handleFillBoardAndCloseSettings}
         isAutoNotesEnabled={isAutoNotesEnabled}
         onSetAutoNotes={handleSetAutoNotes}
+        isHighlightNotesEnabled={isHighlightNotesEnabled}
+        onSetHighlightNotes={setIsHighlightNotesEnabled}
       />
     </div>
   );

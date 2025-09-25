@@ -15,10 +15,11 @@ interface SudokuBoardProps {
   isDarkMode: boolean;
   forceDarkMode?: boolean;
   isAutoNotesEnabled: boolean;
+  isHighlightNotesEnabled: boolean;
   highlightedNumber: number | null;
 }
 
-const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, highlightedNumber }) => {
+const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber }) => {
   
   const isDark = isDarkMode || forceDarkMode;
 
@@ -73,7 +74,15 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                     
                     const isCorrect = !cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex];
                     
-                    const isHighlighted = highlightedNumber !== null && cellData.value === highlightedNumber && !isSelected;
+                    let isHighlighted = false;
+                    if (highlightedNumber !== null && !isSelected) {
+                      const isHighlightedByValue = cellData.value === highlightedNumber;
+                      const isHighlightedByNote =
+                        isHighlightNotesEnabled &&
+                        cellData.value === 0 &&
+                        (cellData.userNotes.has(highlightedNumber) || cellData.autoNotes.has(highlightedNumber));
+                      isHighlighted = isHighlightedByValue || isHighlightedByNote;
+                    }
 
                     {/* Radius for corner cells. 4px outer - 1px gap = 3px inner. 
                         We use a smaller value (rounded-sm = 2px) to be safe.
@@ -96,6 +105,7 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                         isDarkMode={isDark}
                         className={cellCornerClass}
                         isAutoNotesEnabled={isAutoNotesEnabled}
+                        highlightedNumber={highlightedNumber}
                       />
                     );
                   })}

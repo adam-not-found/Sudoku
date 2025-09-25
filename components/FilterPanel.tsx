@@ -22,6 +22,7 @@ interface CellProps {
   onClick: () => void;
   isDarkMode: boolean;
   isAutoNotesEnabled: boolean;
+  highlightedNumber: number | null;
   className?: string;
 }
 
@@ -34,7 +35,7 @@ function usePrevious<T>(value: T): T | undefined {
   return ref.current;
 }
 
-const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isAutoNotesEnabled, className = '' }) => {
+const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isAutoNotesEnabled, highlightedNumber, className = '' }) => {
   const { value, isInitial, isWrong, userNotes, autoNotes } = data;
 
   const [isAnimating, setIsAnimating] = useState(false);
@@ -50,7 +51,7 @@ const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, is
     if (isCorrect && !isInitial && value !== 0 && value !== prevValue) {
       setIsPopAnimating(true);
     }
-  }, [value, isWrong, isCorrect, isInitial]);
+  }, [value, isWrong, isCorrect, isInitial, prevValue]);
   
   const handleAnimationEnd = () => {
     setIsAnimating(false);
@@ -89,7 +90,7 @@ const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, is
       }
 
       // 3. Overrides for special states (highest priority)
-      if (isHighlighted) {
+      if (isHighlighted && value !== 0) {
         backgroundClass = 'bg-blue-800/60';
       }
       if (isSelected) {
@@ -118,7 +119,7 @@ const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, is
       }
       
       // 3. Overrides for special states
-      if (isHighlighted) {
+      if (isHighlighted && value !== 0) {
         backgroundClass = 'bg-blue-100';
       }
       if (isSelected) {
@@ -143,9 +144,16 @@ const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, is
         const num = i + 1;
         const isUserNote = userNotes.has(num);
         const isAutoNote = autoNotes.has(num);
+        const isNoteVisible = isUserNote || isAutoNote;
+        const isTheHighlightedNote = isNoteVisible && isHighlighted && highlightedNumber === num;
         
         let noteClass = '';
-        if (isUserNote) {
+        if (isTheHighlightedNote) {
+          // A distinct, bold style for the highlighted note number, with a background
+          noteClass = isDarkMode 
+            ? 'bg-sky-500/60 text-white font-bold rounded-sm' 
+            : 'bg-sky-200 text-sky-800 font-bold rounded-sm';
+        } else if (isUserNote) {
           // If auto notes are enabled, user notes are styled distinctly in blue.
           if (isAutoNotesEnabled) {
             noteClass = isDarkMode ? 'text-sky-400 font-medium' : 'text-sky-600 font-medium';
@@ -159,7 +167,7 @@ const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, is
         }
 
         return (
-          <div key={i} className={`flex items-center justify-center transition-colors duration-200 ${noteClass}`}>
+          <div key={i} className={`flex items-center justify-center transition-all duration-200 ${noteClass}`}>
             {isUserNote || isAutoNote ? num : ''}
           </div>
         );
