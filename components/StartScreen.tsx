@@ -107,6 +107,7 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({ board, solution, selectedCell
                         isCorrect={isCorrect}
                         onClick={() => onCellClick(rowIndex, colIndex)}
                         isDarkMode={isDark}
+                        isNotesMode={isNotesMode}
                         className={cellCornerClass}
                         isAutoNotesEnabled={isAutoNotesEnabled}
                         highlightedNumber={highlightedNumber}

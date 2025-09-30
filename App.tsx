@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { generateSudoku, Difficulty } from './services/sudokuGenerator';
 import Header from './components/Header';
 import SudokuBoard from './components/StartScreen'; // Overwritten to be the SudokuBoard component
@@ -64,6 +64,24 @@ const victoryMessages = [
   "All your boxes are belong to us.", // Zero Wing (Meme)
 ];
 
+const SAVED_GAME_KEY = 'sudoku-saved-game';
+
+// Custom JSON replacer to handle Set serialization.
+const serializeSets = (key: string, value: any) => {
+  if (value instanceof Set) {
+    return { __dataType: 'Set', value: [...value] };
+  }
+  return value;
+};
+
+// Custom JSON reviver to handle Set deserialization.
+const deserializeSets = (key: string, value: any) => {
+  if (typeof value === 'object' && value !== null && value.__dataType === 'Set') {
+    return new Set(value.value);
+  }
+  return value;
+};
+
 const deepCopyBoard = (board: CellData[][]): CellData[][] => {
   return board.map(row => 
     row.map(cell => ({
@@ -84,7 +102,6 @@ const App: React.FC = () => {
   const [isNotesMode, setIsNotesMode] = useState(false);
   const [history, setHistory] = useState<CellData[][][]>([]);
   const [redoHistory, setRedoHistory] = useState<CellData[][][]>([]);
-  const [hintsRemaining, setHintsRemaining] = useState(3);
   const [isGameWon, setIsGameWon] = useState(false);
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
   const [victoryMessage, setVictoryMessage] = useState('');
@@ -110,6 +127,32 @@ const App: React.FC = () => {
   // State for hint visuals and logic
   const [hintTargetCell, setHintTargetCell] = useState<{row: number, col: number} | null>(null);
   const [activeHint, setActiveHint] = useState<{row: number, col: number, level: number} | null>(null);
+  const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
+  const cooldownIntervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Cleanup interval on component unmount
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const startCooldown = useCallback(() => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    
+    setIsHintOnCooldown(true);
+    let timer = 5;
+
+    cooldownIntervalRef.current = window.setInterval(() => {
+      timer -= 1;
+      if (timer <= 0) {
+        clearInterval(cooldownIntervalRef.current!);
+        setIsHintOnCooldown(false);
+      }
+    }, 1000);
+  }, []);
 
 
   useEffect(() => {
@@ -152,6 +195,7 @@ const App: React.FC = () => {
     setEndTime(Date.now());
     setSelectedCell(null);
     clearAllHintEffects();
+    localStorage.removeItem(SAVED_GAME_KEY); // Clear saved game on win
   }, [clearAllHintEffects]);
 
   const checkWinCondition = useCallback((currentBoard: CellData[][]) => {
@@ -214,10 +258,15 @@ const App: React.FC = () => {
     setIsNotesMode(false);
     setHistory([]);
     setRedoHistory([]);
-    setHintsRemaining(3);
     setIsGameWon(false);
     setAnimationState('idle');
     clearAllHintEffects();
+    
+    // Reset hint cooldown
+    setIsHintOnCooldown(false);
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
 
     // Reset stats for new game
     setStartTime(Date.now());
@@ -226,9 +275,55 @@ const App: React.FC = () => {
     setMistakesCount(0);
   }, [isAutoNotesEnabled, clearAllHintEffects]);
 
+  // Load game state on initial mount
   useEffect(() => {
-    startNewGame(difficulty);
-  }, []);
+    const savedGameJson = localStorage.getItem(SAVED_GAME_KEY);
+    if (savedGameJson) {
+      try {
+        const savedGame = JSON.parse(savedGameJson, deserializeSets);
+        setBoard(savedGame.board);
+        setPuzzle(savedGame.puzzle);
+        setSolution(savedGame.solution);
+        setHistory(savedGame.history);
+        setRedoHistory(savedGame.redoHistory);
+        setStartTime(savedGame.startTime);
+        setMovesCount(savedGame.movesCount);
+        setMistakesCount(savedGame.mistakesCount);
+        // Sync difficulty with the loaded game's difficulty
+        if (savedGame.difficulty && savedGame.difficulty !== difficulty) {
+            setDifficulty(savedGame.difficulty);
+            localStorage.setItem('sudoku-difficulty', savedGame.difficulty);
+        }
+      } catch (e) {
+        console.error("Error loading saved game:", e);
+        localStorage.removeItem(SAVED_GAME_KEY); // Clear corrupted data
+        startNewGame(difficulty);
+      }
+    } else {
+      startNewGame(difficulty);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // This effect should only run once on component mount.
+
+  // Save game state whenever it changes
+  useEffect(() => {
+    // Don't save if the board isn't initialized, or if the game is won.
+    if (board.length === 0 || isGameWon) {
+      return;
+    }
+    const gameState = {
+      board,
+      puzzle,
+      solution,
+      history,
+      redoHistory,
+      startTime,
+      movesCount,
+      mistakesCount,
+      difficulty,
+    };
+    localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(gameState, serializeSets));
+  }, [board, puzzle, solution, history, redoHistory, startTime, movesCount, mistakesCount, difficulty, isGameWon]);
   
   useEffect(() => {
     if (isGameWon) {
@@ -246,22 +341,82 @@ const App: React.FC = () => {
 
   const handleCellClick = (row: number, col: number) => {
     if (isGameWon) return;
+
+    // If the user clicks on the specifically highlighted hint cell,
+    // clear the highlight and proceed with selection.
+    if (hintTargetCell && hintTargetCell.row === row && hintTargetCell.col === col) {
+      clearHintHighlights();
+    }
+    
+    // A progressive hint is active on a different cell, and the user clicks away.
+    // This should clear the progressive hint state.
+    if (activeHint && (activeHint.row !== row || activeHint.col !== col)) {
+        clearProgressiveHint();
+    }
+
     if (selectedCell?.row === row && selectedCell?.col === col) {
       setSelectedCell(null);
     } else {
       setSelectedCell({ row, col });
     }
-    clearAllHintEffects();
   };
 
-  const handleNumberClick = useCallback((num: number, isFromHint: boolean = false) => {
+  const placeNumberOnBoard = useCallback((row: number, col: number, num: number, isFromHint: boolean = false) => {
+    setHistory(prev => [...prev, board]);
+    setRedoHistory([]);
+    clearAllHintEffects();
+
+    const newBoard = deepCopyBoard(board);
+    const cell = newBoard[row][col];
+    
+    if (!isFromHint) {
+        setMovesCount(prev => prev + 1);
+    }
+    cell.value = num;
+    cell.userNotes.clear();
+    cell.autoNotes.clear();
+    cell.eliminatedNotes.clear();
+    
+    const isCorrect = solution[row][col] === num;
+    cell.isWrong = !isCorrect;
+    
+    if (!isCorrect && !isFromHint) {
+        setMistakesCount(prev => prev + 1);
+    }
+    
+    if (isCorrect) {
+        for (let c = 0; c < 9; c++) {
+            newBoard[row][c].userNotes.delete(num);
+            newBoard[row][c].autoNotes.delete(num);
+        }
+        for (let r = 0; r < 9; r++) {
+            newBoard[r][col].userNotes.delete(num);
+            newBoard[r][col].autoNotes.delete(num);
+        }
+        const boxStartRow = Math.floor(row / 3) * 3;
+        const boxStartCol = Math.floor(col / 3) * 3;
+        for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+            for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                newBoard[r][c].userNotes.delete(num);
+                newBoard[r][c].autoNotes.delete(num);
+            }
+        }
+        
+        if (checkWinCondition(newBoard)) {
+            triggerWinState();
+        }
+    }
+    setBoard(newBoard);
+  }, [board, solution, clearAllHintEffects, checkWinCondition, triggerWinState]);
+
+  const handleNumberClick = useCallback((num: number) => {
     if (!selectedCell || isGameWon || solution.length === 0) return;
 
     const { row, col } = selectedCell;
     const cellData = board[row][col];
     if (cellData.isInitial) return;
 
-    if (isNotesMode && !isFromHint) {
+    if (isNotesMode) {
         if (cellData.eliminatedNotes.has(num)) {
             return; // Cannot interact with red "eliminated" notes
         }
@@ -286,59 +441,14 @@ const App: React.FC = () => {
         cell.value = 0;
         setBoard(newBoard);
     } else {
-        setHistory(prev => [...prev, board]);
-        setRedoHistory([]);
-        clearAllHintEffects();
-
-        const newBoard = deepCopyBoard(board);
-        const cell = newBoard[row][col];
-        
-        if (!isFromHint) {
-            setMovesCount(prev => prev + 1);
-        }
-        cell.value = num;
-        cell.userNotes.clear();
-        cell.autoNotes.clear();
-        cell.eliminatedNotes.clear();
-        
-        const isCorrect = solution[row][col] === num;
-        cell.isWrong = !isCorrect;
-        
-        if (!isCorrect && !isFromHint) {
-            setMistakesCount(prev => prev + 1);
-        }
-        
-        if (isCorrect) {
-            for (let c = 0; c < 9; c++) {
-                newBoard[row][c].userNotes.delete(num);
-                newBoard[row][c].autoNotes.delete(num);
-            }
-            for (let r = 0; r < 9; r++) {
-                newBoard[r][col].userNotes.delete(num);
-                newBoard[r][col].autoNotes.delete(num);
-            }
-            const boxStartRow = Math.floor(row / 3) * 3;
-            const boxStartCol = Math.floor(col / 3) * 3;
-            for (let r = boxStartRow; r < boxStartRow + 3; r++) {
-                for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-                    newBoard[r][c].userNotes.delete(num);
-                    newBoard[r][c].autoNotes.delete(num);
-                }
-            }
-            
-            if (checkWinCondition(newBoard)) {
-                triggerWinState();
-            }
-        }
-        setBoard(newBoard);
+        placeNumberOnBoard(row, col, num);
     }
-  }, [board, isNotesMode, selectedCell, isGameWon, solution, checkWinCondition, triggerWinState, clearAllHintEffects]);
+  }, [board, isNotesMode, selectedCell, isGameWon, solution, clearAllHintEffects, placeNumberOnBoard]);
   
   const handleToggleNotesMode = useCallback(() => {
     if (isGameWon) return;
     setIsNotesMode(prev => !prev);
-    clearAllHintEffects();
-  }, [isGameWon, clearAllHintEffects]);
+  }, [isGameWon]);
 
   const handleUndo = useCallback(() => {
     if (history.length === 0 || isGameWon) return;
@@ -386,97 +496,82 @@ const App: React.FC = () => {
 
 
   const handleHint = useCallback(() => {
-    if (hintsRemaining <= 0 || isGameWon || solution.length === 0) return;
-
-    clearHintHighlights();
+    if (isHintOnCooldown || isGameWon || solution.length === 0) return;
 
     const isHintableCellSelected = selectedCell && !board[selectedCell.row][selectedCell.col].isInitial && board[selectedCell.row][selectedCell.col].value === 0;
 
-    // Case 1: A valid cell is selected -> Progressive Hint
+    // Scenario 1: A valid cell is selected.
     if (isHintableCellSelected) {
         const { row, col } = selectedCell;
-        let nextLevel = 1;
+        const candidates = getCandidates(board, row, col);
+        const hasUsedHintOnCell = activeHint && activeHint.row === row && activeHint.col === col;
 
-        if (activeHint && activeHint.row === row && activeHint.col === col) {
-            nextLevel = activeHint.level + 1;
-        } else {
-            setHintsRemaining(prev => prev - 1);
+        // Sub-scenario 1: Reveal the answer.
+        // This happens if there's only one possible number, OR if the user asks for a hint on the same cell again.
+        if (candidates.size === 1 || hasUsedHintOnCell) {
+            startCooldown();
+            placeNumberOnBoard(row, col, solution[row][col], true);
+            return;
         }
 
-        setActiveHint({ row, col, level: nextLevel });
-
-        switch (nextLevel) {
-            case 1: { // Candidate Elimination
-                clearHintHighlights();
-                const correctAnswer = solution[row][col];
-                const cellForNotes = board[row][col];
-                const existingNotes = cellForNotes.userNotes.size > 0 ? cellForNotes.userNotes : cellForNotes.autoNotes;
-
-                let incorrectNotesToShow: number[] = [];
-
-                if (existingNotes.size > 0) {
-                    const incorrectNotesInCell = Array.from(existingNotes).filter(n => n !== correctAnswer);
-                    const shuffled = incorrectNotesInCell.sort(() => 0.5 - Math.random());
-                    const countToHighlight = Math.max(1, Math.ceil(shuffled.length / 2));
-                    incorrectNotesToShow = shuffled.slice(0, countToHighlight);
-                } else {
-                    const candidates = getCandidates(board, row, col);
-                    candidates.delete(correctAnswer);
-                    incorrectNotesToShow = Array.from(candidates).slice(0, 3);
-                }
-                
-                const newBoard = deepCopyBoard(board);
-                const cellToUpdate = newBoard[row][col];
-                
-                incorrectNotesToShow.forEach(num => {
-                    cellToUpdate.eliminatedNotes.add(num);
-                    cellToUpdate.userNotes.delete(num);
-                    cellToUpdate.autoNotes.delete(num);
-                });
-                
-                setHistory(prev => [...prev, board]);
-                setRedoHistory([]);
-                setBoard(newBoard);
-                return;
-            }
+        // Sub-scenario 2: Eliminate incorrect notes (the first hint for a cell with multiple candidates).
+        if (candidates.size > 1) {
+            startCooldown();
+            clearAllHintEffects(); // Clear any other stray hint effects before setting the new one.
+            setActiveHint({ row, col, level: 1 }); // Mark that a hint was used on this cell for the next time.
             
-            case 2: // The Answer
-            default:
-                handleNumberClick(solution[row][col], true);
-                clearAllHintEffects();
-                setActiveHint(null);
-                return;
+            const correctAnswer = solution[row][col];
+            const incorrectNotes = Array.from(candidates).filter(n => n !== correctAnswer);
+            const shuffled = incorrectNotes.sort(() => 0.5 - Math.random());
+            const countToEliminate = Math.max(1, Math.ceil(shuffled.length / 2));
+            const notesToEliminate = shuffled.slice(0, countToEliminate);
+            
+            const newBoard = deepCopyBoard(board);
+            const cellToUpdate = newBoard[row][col];
+            notesToEliminate.forEach(num => {
+                cellToUpdate.eliminatedNotes.add(num);
+                cellToUpdate.userNotes.delete(num);
+                cellToUpdate.autoNotes.delete(num);
+            });
+            
+            setHistory(prev => [...prev, board]);
+            setRedoHistory([]);
+            setBoard(newBoard);
+            return;
         }
+        return; // If a cell is selected but has 0 candidates, do nothing.
     }
 
-
-    // Case 2: No cell selected or cell not hintable -> "Smart Nudge"
-    let candidateCells: { row: number; col: number }[] = [];
-    let minCandidates = 10;
-    const gridValues = board.map(row => row.map(cell => cell.value));
-
+    // Scenario 2: No valid cell is selected. Highlight the easiest cell to solve.
+    let candidateCells: { row: number; col: number; size: number }[] = [];
     for (let r = 0; r < 9; r++) {
         for (let c = 0; c < 9; c++) {
-            if (gridValues[r][c] === 0) {
+            if (board[r][c].value === 0) {
                 const candidates = getCandidates(board, r, c);
                 if (candidates.size > 0) {
-                    if (candidates.size < minCandidates) {
-                        minCandidates = candidates.size;
-                        candidateCells = [{ row: r, col: c }];
-                    } else if (candidates.size === minCandidates) {
-                        candidateCells.push({ row: r, col: c });
-                    }
+                    candidateCells.push({ row: r, col: c, size: candidates.size });
                 }
             }
         }
     }
 
-    let bestCell: { row: number; col: number } | null = null;
-    if (candidateCells.length === 1) {
-        bestCell = candidateCells[0];
-    } else if (candidateCells.length > 1) {
+    if (candidateCells.length === 0) return; // No hint possible
+
+    // Sort to find the cell with the fewest candidates.
+    candidateCells.sort((a, b) => a.size - b.size);
+    const minSize = candidateCells[0].size;
+    const tiedCells = candidateCells.filter(cell => cell.size === minSize);
+    
+    let bestCell: { row: number, col: number };
+    if (tiedCells.length === 1) {
+        bestCell = tiedCells[0];
+    } else {
+        // Tie-breaker: find the cell in the most "filled" or constrained region.
         let maxScore = -1;
-        for (const cell of candidateCells) {
+        let scoredCell: { row: number; col: number } | null = null;
+        const gridValues = board.map(row => row.map(cell => cell.value));
+        
+        for (const cell of tiedCells) {
             let score = 0;
             const { row, col } = cell;
             for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
@@ -490,20 +585,18 @@ const App: React.FC = () => {
             }
             if (score > maxScore) {
                 maxScore = score;
-                bestCell = cell;
+                scoredCell = cell;
             }
         }
+        bestCell = scoredCell!;
     }
 
     if (bestCell) {
+        startCooldown();
+        clearAllHintEffects();
         setHintTargetCell(bestCell);
-        if (!isHintableCellSelected) {
-             setHintsRemaining(prev => prev - 1);
-        }
-        setActiveHint(null);
-        setTimeout(clearHintHighlights, 2000);
     }
-}, [board, hintsRemaining, selectedCell, isGameWon, solution, activeHint, handleNumberClick, clearHintHighlights, clearAllHintEffects]);
+}, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, placeNumberOnBoard, clearAllHintEffects, startCooldown]);
 
 
   const handleFillBoard = useCallback(() => {
@@ -566,7 +659,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isGameWon || isSettingsOpen) return;
-      clearAllHintEffects();
 
       if (!selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         setSelectedCell({ row: 0, col: 0 });
@@ -617,7 +709,7 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen, clearAllHintEffects]);
+  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen]);
 
   if (board.length === 0 || solution.length === 0) {
     return <div className="flex items-center justify-center min-h-screen">Generating Puzzle...</div>;
@@ -634,7 +726,6 @@ const App: React.FC = () => {
   };
 
   const elapsedTime = endTime > 0 ? endTime - startTime : 0;
-  const hintsUsed = 3 - hintsRemaining;
 
   const highlightedNumber = selectedCell && board[selectedCell.row][selectedCell.col].value > 0
     ? board[selectedCell.row][selectedCell.col].value
@@ -647,8 +738,9 @@ const App: React.FC = () => {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onNewGame={() => startNewGame(difficulty)}
         />
-      <div className={`min-h-screen flex items-center justify-center pt-24 pb-4 px-4`}>
-        <main className={`w-full max-w-lg flex flex-col items-center transition-all duration-300 ${isSettingsOpen ? 'blur-sm pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-32 pb-4 sm:pb-8 px-4`}>
+        <main className={`w-full max-w-lg flex flex-col items-center gap-4 sm:gap-6 transition-all duration-300 ${isSettingsOpen ? 'blur-sm pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
+          {/* Sudoku Board Section */}
           <div className="relative w-full">
             {animationState !== 'idle' && (
               <VictoryScreen 
@@ -656,7 +748,6 @@ const App: React.FC = () => {
                 moves={movesCount}
                 time={formatTime(elapsedTime)}
                 mistakes={mistakesCount}
-                hintsUsed={hintsUsed}
               />
             )}
             <SudokuBoard 
@@ -673,47 +764,55 @@ const App: React.FC = () => {
               hintTargetCell={hintTargetCell}
             />
           </div>
-          <div className="mt-6 w-full max-w-lg flex flex-col items-center gap-4">
-              <div className="relative w-full" style={{minHeight: '160px'}}>
-                  <div className={`
-                      absolute inset-0 flex flex-col items-center justify-center gap-4
-                      transition-opacity duration-300 ease-in-out
-                      ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}
-                  `}>
-                      <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`}>
-                          <NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} />
-                      </div>
-                      <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`}>
-                          <Controls 
-                              isNotesMode={isNotesMode}
-                              onToggleNotesMode={handleToggleNotesMode}
-                              onUndo={handleUndo}
-                              canUndo={history.length > 0}
-                              onRedo={handleRedo}
-                              canRedo={redoHistory.length > 0}
-                              onHint={handleHint}
-                              hintsRemaining={hintsRemaining}
-                              onDelete={handleDelete}
-                              isDarkMode={isDarkMode}
-                          />
-                      </div>
+          
+          {/* NumberPad Section */}
+          <div className={`
+              relative w-full
+              transition-opacity duration-300 ease-in-out
+              ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+          `}>
+              <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`}>
+                  <NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} />
+              </div>
+          </div>
+          
+          {/* Controls and Play Again Section */}
+          <div className="relative w-full" style={{minHeight: '80px'}}>
+              <div className={`
+                  absolute inset-0 flex flex-col items-center justify-center
+                  transition-opacity duration-300 ease-in-out
+                  ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+              `}>
+                  <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`}>
+                      <Controls 
+                          isNotesMode={isNotesMode}
+                          onToggleNotesMode={handleToggleNotesMode}
+                          onUndo={handleUndo}
+                          canUndo={history.length > 0}
+                          onRedo={handleRedo}
+                          canRedo={redoHistory.length > 0}
+                          onHint={handleHint}
+                          isHintOnCooldown={isHintOnCooldown}
+                          onDelete={handleDelete}
+                          isDarkMode={isDarkMode}
+                      />
                   </div>
+              </div>
 
-                  <div className={`
-                      absolute inset-0 flex items-center justify-center
-                      transition-all duration-500 ease-in-out transform
-                      ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}
-                  `} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}}>
-                      <div className="relative w-auto rounded-full p-1 shadow-lg bg-slate-800">
-                          <button
-                              onClick={() => startNewGame(difficulty)}
-                              className="w-auto bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 flex items-center justify-center"
-                          >
-                               <span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>
-                                  Play Again
-                              </span>
-                          </button>
-                      </div>
+              <div className={`
+                  absolute inset-0 flex items-center justify-center
+                  transition-all duration-500 ease-in-out transform
+                  ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}
+              `} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}}>
+                  <div className="relative w-auto rounded-full p-1 shadow-lg bg-slate-800">
+                      <button
+                          onClick={() => startNewGame(difficulty)}
+                          className="w-auto bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 flex items-center justify-center"
+                      >
+                           <span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>
+                              Play Again
+                          </span>
+                      </button>
                   </div>
               </div>
           </div>

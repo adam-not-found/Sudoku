@@ -71,6 +71,34 @@
       .animate-rotate {
         animation: rotate 0.5s ease-in-out;
       }
+
+      @keyframes hint-pop-glow {
+        0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); }
+        100% { box-shadow: 0 0 10px 25px rgba(251, 191, 36, 0); }
+      }
+      .animate-hint-pop {
+        animation: hint-pop-glow 0.4s ease-out;
+      }
+
+      @keyframes hint-refill-glow {
+        0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5); }
+        100% { box-shadow: 0 0 8px 15px rgba(251, 191, 36, 0); }
+      }
+      .animate-hint-refill {
+        animation: hint-refill-glow 0.3s ease-out;
+      }
+
+      @keyframes fill-up {
+        from { clip-path: inset(100% 0 0 0); }
+        to { clip-path: inset(0% 0 0 0); }
+      }
+      .animate-fill-up {
+        animation: fill-up 5s linear forwards;
+      }
+
+      .text-shadow-blue-glow {
+        text-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+      }
     </style>
   </head>
   <body>
@@ -79,7 +107,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          navigator.serviceWorker.register('sw.js')
             .then(registration => {
               console.log('Service Worker registered with scope:', registration.scope);
             })

@@ -10,7 +10,6 @@ interface VictoryScreenProps {
   moves: number;
   time: string;
   mistakes: number;
-  hintsUsed: number;
 }
 
 const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
@@ -20,7 +19,7 @@ const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, 
   </div>
 );
 
-const VictoryScreen: React.FC<VictoryScreenProps> = ({ message, moves, time, mistakes, hintsUsed }) => {
+const VictoryScreen: React.FC<VictoryScreenProps> = ({ message, moves, time, mistakes }) => {
   const [showContainer, setShowContainer] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -71,14 +70,13 @@ const VictoryScreen: React.FC<VictoryScreenProps> = ({ message, moves, time, mis
           </h2>
 
           <div className={`
-            grid grid-cols-2 gap-x-16 gap-y-8
+            flex justify-center items-center gap-x-8 sm:gap-x-12
             transition-all duration-500 ease-in-out
             ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
           `}>
             <StatItem label="Time" value={time} />
             <StatItem label="Moves" value={moves} />
             <StatItem label="Mistakes" value={mistakes} />
-            <StatItem label="Hints" value={hintsUsed} />
           </div>
         </div>
       </div>

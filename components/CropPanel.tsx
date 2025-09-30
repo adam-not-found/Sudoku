@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React from 'react';
-import { UndoIcon, RedoIcon, EraseIcon, NotesIcon, HintIconFull, HintIconTwoThirds, HintIconOneThird, HintIconEmptyCracked } from './icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { UndoIcon, RedoIcon, EraseIcon, NotesIcon, HintIconFull, HintIconEmpty } from './icons';
 
 interface ControlsProps {
   isNotesMode: boolean;
@@ -14,7 +14,7 @@ interface ControlsProps {
   onRedo: () => void;
   canRedo: boolean;
   onHint: () => void;
-  hintsRemaining: number;
+  isHintOnCooldown: boolean;
   onDelete: () => void;
   isDarkMode: boolean;
 }
@@ -27,18 +27,27 @@ const Controls: React.FC<ControlsProps> = ({
   onRedo,
   canRedo, 
   onHint, 
-  hintsRemaining, 
+  isHintOnCooldown,
   onDelete,
   isDarkMode
 }) => {
+  const [animation, setAnimation] = useState<'pop' | 'refill' | null>(null);
+  const prevCooldown = useRef(isHintOnCooldown);
+  const animationKey = useRef(0);
 
-  const getHintIcon = () => {
-    switch (hintsRemaining) {
-      case 3: return <HintIconFull />;
-      case 2: return <HintIconTwoThirds />;
-      case 1: return <HintIconOneThird />;
-      default: return <HintIconEmptyCracked />;
+  useEffect(() => {
+    // When the cooldown finishes, trigger the 'refill' animation.
+    if (prevCooldown.current && !isHintOnCooldown) {
+      setAnimation('refill');
     }
+    prevCooldown.current = isHintOnCooldown;
+  }, [isHintOnCooldown]);
+  
+  const handleHintClick = () => {
+    if (isHintOnCooldown) return;
+    animationKey.current += 1;
+    setAnimation('pop');
+    onHint();
   };
 
   const baseButtonClasses = "w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 transform focus:outline-none active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-transparent";
@@ -52,9 +61,9 @@ const Controls: React.FC<ControlsProps> = ({
     ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' 
     : iconButtonClasses;
 
-  const hintButtonDisabled = hintsRemaining <= 0;
+  const hintHoverClass = isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
 
-  const hintHoverClass = hintButtonDisabled ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
+  const animationClass = animation === 'pop' ? 'animate-hint-pop' : animation === 'refill' ? 'animate-hint-refill' : '';
 
   return (
     <div className={`rounded-full p-2 flex justify-center items-center gap-2 shadow-lg transition-colors duration-300 ${containerClasses}`}>
@@ -91,12 +100,27 @@ const Controls: React.FC<ControlsProps> = ({
         <NotesIcon />
       </button>
       <button 
-        onClick={onHint}
-        disabled={hintButtonDisabled}
-        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass}`}
-        aria-label={`Get a hint, ${hintsRemaining} remaining`}
+        onClick={handleHintClick}
+        disabled={isHintOnCooldown}
+        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${animationClass}`}
+        onAnimationEnd={() => setAnimation(null)}
+        aria-label={isHintOnCooldown ? "Hint is on cooldown" : "Get a hint"}
       >
-        {getHintIcon()}
+        <div className="relative w-full h-full flex items-center justify-center">
+          {isHintOnCooldown ? (
+            <>
+              <HintIconEmpty />
+              <div
+                key={animationKey.current}
+                className="absolute w-full h-full animate-fill-up flex items-center justify-center"
+              >
+                <HintIconFull />
+              </div>
+            </>
+          ) : (
+            <HintIconFull />
+          )}
+        </div>
       </button>
     </div>
   );

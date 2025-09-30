@@ -36,43 +36,17 @@ export const NotesIcon: React.FC = () => (
   </svg>
 );
 
-const bulbOutlinePath = "M12 2.25c-4.142 0-7.5 3.358-7.5 7.5 0 2.434 1.157 4.583 2.963 5.992v3.008a.75.75 0 00.75.75h7.584a.75.75 0 00.75-.75v-3.008c1.806-1.409 2.963-3.558 2.963-5.992 0-4.142-3.358-7.5-7.5-7.5zM9.75 21a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H9.75z";
+const bulbPath = "M12 2.25c-4.142 0-7.5 3.358-7.5 7.5 0 2.434 1.157 4.583 2.963 5.992v3.008a.75.75 0 00.75.75h7.584a.75.75 0 00.75-.75v-3.008c1.806-1.409 2.963-3.558 2.963-5.992 0-4.142-3.358-7.5-7.5-7.5zM9.75 21a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H9.75z";
 
 export const HintIconFull: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d={bulbOutlinePath} />
+    <path strokeLinecap="round" strokeLinejoin="round" d={bulbPath} />
   </svg>
 );
 
-export const HintIconTwoThirds: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24">
-    <defs>
-      <clipPath id="clip-two-thirds">
-        <rect x="0" y="7.5" width="24" height="18" />
-      </clipPath>
-    </defs>
-    <path d={bulbOutlinePath} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-    <path d={bulbOutlinePath} fill="currentColor" clipPath="url(#clip-two-thirds)" />
-  </svg>
-);
-
-export const HintIconOneThird: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24">
-    <defs>
-      <clipPath id="clip-one-third">
-        <rect x="0" y="12" width="24" height="12" />
-      </clipPath>
-    </defs>
-    <path d={bulbOutlinePath} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-    <path d={bulbOutlinePath} fill="currentColor" clipPath="url(#clip-one-third)" />
-  </svg>
-);
-
-export const HintIconEmptyCracked: React.FC = () => (
+export const HintIconEmpty: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d={bulbOutlinePath} />
-    {/* chip/crack effect */}
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 4l-2 3 2.5 2 -2.5 3" />
+    <path strokeLinecap="round" strokeLinejoin="round" d={bulbPath} />
   </svg>
 );
 
