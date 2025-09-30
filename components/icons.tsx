@@ -14,15 +14,6 @@ export const UndoIcon: React.FC = () => (
   </svg>
 );
 
-export const RedoIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-    <g transform="translate(-2, 2)">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 15v-3.375A4.125 4.125 0 0113.125 7.5H19.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 11.25L19.5 7.5l-3.75-3.75" />
-    </g>
-  </svg>
-);
-
 export const EraseIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

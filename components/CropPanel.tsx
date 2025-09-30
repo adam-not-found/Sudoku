@@ -4,17 +4,16 @@
 */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UndoIcon, RedoIcon, EraseIcon, NotesIcon, HintIconFull, HintIconEmpty } from './icons';
+import { UndoIcon, EraseIcon, NotesIcon, HintIconFull, HintIconEmpty } from './icons';
 
 interface ControlsProps {
   isNotesMode: boolean;
   onToggleNotesMode: () => void;
   onUndo: () => void;
   canUndo: boolean;
-  onRedo: () => void;
-  canRedo: boolean;
   onHint: () => void;
   isHintOnCooldown: boolean;
+  cooldownDuration: number;
   onDelete: () => void;
   isDarkMode: boolean;
 }
@@ -24,10 +23,9 @@ const Controls: React.FC<ControlsProps> = ({
   onToggleNotesMode, 
   onUndo, 
   canUndo,
-  onRedo,
-  canRedo, 
   onHint, 
   isHintOnCooldown,
+  cooldownDuration,
   onDelete,
   isDarkMode
 }) => {
@@ -75,16 +73,6 @@ const Controls: React.FC<ControlsProps> = ({
       >
         <UndoIcon />
       </button>
-      <div className={`transition-all duration-300 grid place-items-center ${canRedo ? 'w-12 opacity-100' : 'w-0 opacity-0 -mr-2'}`}>
-        <button 
-            onClick={onRedo}
-            disabled={!canRedo}
-            className={`${baseButtonClasses} ${iconButtonClasses}`}
-            aria-label="Redo last undone move"
-          >
-            <RedoIcon />
-        </button>
-      </div>
       <button 
         onClick={onDelete}
         className={`${baseButtonClasses} ${iconButtonClasses}`}
@@ -113,6 +101,7 @@ const Controls: React.FC<ControlsProps> = ({
               <div
                 key={animationKey.current}
                 className="absolute w-full h-full animate-fill-up flex items-center justify-center"
+                style={{ animationDuration: `${cooldownDuration}s` }}
               >
                 <HintIconFull />
               </div>

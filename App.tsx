@@ -131,7 +131,6 @@ const App: React.FC = () => {
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [isNotesMode, setIsNotesMode] = useState(false);
   const [history, setHistory] = useState<CellData[][][]>([]);
-  const [redoHistory, setRedoHistory] = useState<CellData[][][]>([]);
   const [isGameWon, setIsGameWon] = useState(false);
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
   const [victoryMessage, setVictoryMessage] = useState('');
@@ -169,6 +168,8 @@ const App: React.FC = () => {
   const [hintTargetCell, setHintTargetCell] = useState<{row: number, col: number} | null>(null);
   const [activeHint, setActiveHint] = useState<{row: number, col: number, level: number} | null>(null);
   const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
+  const [hintUsageCount, setHintUsageCount] = useState(0);
+  const [hintCooldownDuration, setHintCooldownDuration] = useState(5); // in seconds
   const cooldownIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -183,8 +184,12 @@ const App: React.FC = () => {
   const startCooldown = useCallback(() => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     
+    const durations = [5, 10, 20, 30, 60]; // in seconds
+    const currentDuration = durations[Math.min(hintUsageCount, durations.length - 1)];
+    setHintCooldownDuration(currentDuration);
+
     setIsHintOnCooldown(true);
-    let timer = 5;
+    let timer = currentDuration;
 
     cooldownIntervalRef.current = window.setInterval(() => {
       timer -= 1;
@@ -193,7 +198,7 @@ const App: React.FC = () => {
         setIsHintOnCooldown(false);
       }
     }, 1000);
-  }, []);
+  }, [hintUsageCount]);
 
 
   useEffect(() => {
@@ -333,16 +338,16 @@ const App: React.FC = () => {
     setSelectedCell(null);
     setIsNotesMode(false);
     setHistory([]);
-    setRedoHistory([]);
     setIsGameWon(false);
     setAnimationState('idle');
     clearAllHintEffects();
     
-    // Reset hint cooldown
+    // Reset hint cooldown and usage
     setIsHintOnCooldown(false);
     if (cooldownIntervalRef.current) {
       clearInterval(cooldownIntervalRef.current);
     }
+    setHintUsageCount(0);
 
     // Reset stats for new game
     setStartTime(Date.now());
@@ -361,10 +366,10 @@ const App: React.FC = () => {
         setPuzzle(savedGame.puzzle);
         setSolution(savedGame.solution);
         setHistory(savedGame.history);
-        setRedoHistory(savedGame.redoHistory);
         setStartTime(savedGame.startTime);
         setMovesCount(savedGame.movesCount);
         setMistakesCount(savedGame.mistakesCount);
+        setHintUsageCount(savedGame.hintUsageCount || 0);
         // Sync difficulty with the loaded game's difficulty
         if (savedGame.difficulty && savedGame.difficulty !== difficulty) {
             setDifficulty(savedGame.difficulty);
@@ -392,14 +397,14 @@ const App: React.FC = () => {
       puzzle,
       solution,
       history,
-      redoHistory,
       startTime,
       movesCount,
       mistakesCount,
       difficulty,
+      hintUsageCount,
     };
     localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(gameState, serializeSets));
-  }, [board, puzzle, solution, history, redoHistory, startTime, movesCount, mistakesCount, difficulty, isGameWon]);
+  }, [board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
   
   useEffect(() => {
     if (isGameWon) {
@@ -439,7 +444,6 @@ const App: React.FC = () => {
 
   const placeNumberOnBoard = useCallback((row: number, col: number, num: number, isFromHint: boolean = false) => {
     setHistory(prev => [...prev, board]);
-    setRedoHistory([]);
     clearAllHintEffects();
 
     const newBoard = deepCopyBoard(board);
@@ -501,7 +505,6 @@ const App: React.FC = () => {
         if (!willChange) return;
 
         setHistory(prev => [...prev, board]);
-        setRedoHistory([]);
         clearAllHintEffects();
         
         const newBoard = deepCopyBoard(board);
@@ -529,20 +532,10 @@ const App: React.FC = () => {
   const handleUndo = useCallback(() => {
     if (history.length === 0 || isGameWon) return;
     const lastState = history[history.length - 1];
-    setRedoHistory(prev => [...prev, board]);
     setBoard(lastState);
     setHistory(history.slice(0, -1));
     clearAllHintEffects();
   }, [board, history, isGameWon, clearAllHintEffects]);
-
-  const handleRedo = useCallback(() => {
-    if (redoHistory.length === 0 || isGameWon) return;
-    const nextState = redoHistory[redoHistory.length - 1];
-    setHistory(prev => [...prev, board]);
-    setBoard(nextState);
-    setRedoHistory(redoHistory.slice(0, -1));
-    clearAllHintEffects();
-  }, [board, redoHistory, isGameWon, clearAllHintEffects]);
 
   const handleDelete = useCallback(() => {
     if (!selectedCell || isGameWon) return;
@@ -557,7 +550,6 @@ const App: React.FC = () => {
     }
 
     setHistory(prev => [...prev, board]);
-    setRedoHistory([]);
     clearAllHintEffects();
 
     const newBoard = deepCopyBoard(board);
@@ -574,6 +566,7 @@ const App: React.FC = () => {
   const handleHint = useCallback(() => {
     if (isHintOnCooldown || isGameWon || solution.length === 0) return;
 
+    let hintActionTaken = false;
     const isHintableCellSelected = selectedCell && !board[selectedCell.row][selectedCell.col].isInitial && board[selectedCell.row][selectedCell.col].value === 0;
 
     // Scenario 1: A valid cell is selected.
@@ -582,17 +575,10 @@ const App: React.FC = () => {
         const candidates = getCandidates(board, row, col);
         const hasUsedHintOnCell = activeHint && activeHint.row === row && activeHint.col === col;
 
-        // Sub-scenario 1: Reveal the answer.
-        // This happens if there's only one possible number, OR if the user asks for a hint on the same cell again.
         if (candidates.size === 1 || hasUsedHintOnCell) {
-            startCooldown();
             placeNumberOnBoard(row, col, solution[row][col], true);
-            return;
-        }
-
-        // Sub-scenario 2: Eliminate incorrect notes (the first hint for a cell with multiple candidates).
-        if (candidates.size > 1) {
-            startCooldown();
+            hintActionTaken = true;
+        } else if (candidates.size > 1) {
             clearAllHintEffects(); // Clear any other stray hint effects before setting the new one.
             setActiveHint({ row, col, level: 1 }); // Mark that a hint was used on this cell for the next time.
             
@@ -611,66 +597,69 @@ const App: React.FC = () => {
             });
             
             setHistory(prev => [...prev, board]);
-            setRedoHistory([]);
             setBoard(newBoard);
-            return;
+            hintActionTaken = true;
         }
-        return; // If a cell is selected but has 0 candidates, do nothing.
-    }
-
-    // Scenario 2: No valid cell is selected. Highlight the easiest cell to solve.
-    let candidateCells: { row: number; col: number; size: number }[] = [];
-    for (let r = 0; r < 9; r++) {
-        for (let c = 0; c < 9; c++) {
-            if (board[r][c].value === 0) {
-                const candidates = getCandidates(board, r, c);
-                if (candidates.size > 0) {
-                    candidateCells.push({ row: r, col: c, size: candidates.size });
-                }
-            }
-        }
-    }
-
-    if (candidateCells.length === 0) return; // No hint possible
-
-    // Sort to find the cell with the fewest candidates.
-    candidateCells.sort((a, b) => a.size - b.size);
-    const minSize = candidateCells[0].size;
-    const tiedCells = candidateCells.filter(cell => cell.size === minSize);
-    
-    let bestCell: { row: number, col: number };
-    if (tiedCells.length === 1) {
-        bestCell = tiedCells[0];
     } else {
-        // Tie-breaker: find the cell in the most "filled" or constrained region.
-        let maxScore = -1;
-        let scoredCell: { row: number; col: number } | null = null;
-        const gridValues = board.map(row => row.map(cell => cell.value));
+      // Scenario 2: No valid cell is selected. Highlight the easiest cell to solve.
+      let candidateCells: { row: number; col: number; size: number }[] = [];
+      for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+              if (board[r][c].value === 0) {
+                  const candidates = getCandidates(board, r, c);
+                  if (candidates.size > 0) {
+                      candidateCells.push({ row: r, col: c, size: candidates.size });
+                  }
+              }
+          }
+      }
+
+      if (candidateCells.length > 0) {
+        // Sort to find the cell with the fewest candidates.
+        candidateCells.sort((a, b) => a.size - b.size);
+        const minSize = candidateCells[0].size;
+        const tiedCells = candidateCells.filter(cell => cell.size === minSize);
         
-        for (const cell of tiedCells) {
-            let score = 0;
-            const { row, col } = cell;
-            for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
-            for (let i = 0; i < 9; i++) { if (gridValues[i][col] !== 0) score++; }
-            const boxStartRow = Math.floor(row / 3) * 3;
-            const boxStartCol = Math.floor(col / 3) * 3;
-            for (let r = boxStartRow; r < boxStartRow + 3; r++) {
-                for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-                    if (gridValues[r][c] !== 0) score++;
+        let bestCell: { row: number, col: number };
+        if (tiedCells.length === 1) {
+            bestCell = tiedCells[0];
+        } else {
+            // Tie-breaker: find the cell in the most "filled" or constrained region.
+            let maxScore = -1;
+            let scoredCell: { row: number; col: number } | null = null;
+            const gridValues = board.map(row => row.map(cell => cell.value));
+            
+            for (const cell of tiedCells) {
+                let score = 0;
+                const { row, col } = cell;
+                for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
+                for (let i = 0; i < 9; i++) { if (gridValues[i][col] !== 0) score++; }
+                const boxStartRow = Math.floor(row / 3) * 3;
+                const boxStartCol = Math.floor(col / 3) * 3;
+                for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+                    for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                        if (gridValues[r][c] !== 0) score++;
+                    }
+                }
+                if (score > maxScore) {
+                    maxScore = score;
+                    scoredCell = cell;
                 }
             }
-            if (score > maxScore) {
-                maxScore = score;
-                scoredCell = cell;
-            }
+            bestCell = scoredCell!;
         }
-        bestCell = scoredCell!;
+
+        if (bestCell) {
+            clearAllHintEffects();
+            setHintTargetCell(bestCell);
+            hintActionTaken = true;
+        }
+      }
     }
 
-    if (bestCell) {
-        startCooldown();
-        clearAllHintEffects();
-        setHintTargetCell(bestCell);
+    if (hintActionTaken) {
+      startCooldown();
+      setHintUsageCount(prev => prev + 1);
     }
 }, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, placeNumberOnBoard, clearAllHintEffects, startCooldown]);
 
@@ -727,7 +716,6 @@ const App: React.FC = () => {
     }
 
     setHistory(prev => [...prev, board]);
-    setRedoHistory([]);
     setBoard(newBoard);
   };
   
@@ -868,10 +856,9 @@ const App: React.FC = () => {
                           onToggleNotesMode={handleToggleNotesMode}
                           onUndo={handleUndo}
                           canUndo={history.length > 0}
-                          onRedo={handleRedo}
-                          canRedo={redoHistory.length > 0}
                           onHint={handleHint}
                           isHintOnCooldown={isHintOnCooldown}
+                          cooldownDuration={hintCooldownDuration}
                           onDelete={handleDelete}
                           isDarkMode={isDarkMode}
                       />

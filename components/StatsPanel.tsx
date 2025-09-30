@@ -102,7 +102,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ isOpen, onClose, stats, isDarkM
             {/* Difficulty Stats - Only show if at least one difficulty has been won */}
             {playedDifficulties.length > 0 && activeTab && currentDifficultyStats && (
               <div className="flex flex-col gap-3">
-                  <div className={`flex justify-center gap-2 p-1 rounded-lg ${isDarkMode ? 'bg-slate-900/50' : 'bg-slate-100'}`}>
+                  <div className="flex justify-center gap-2">
                       {playedDifficulties.map(({ id, label }) => (
                           <button 
                               key={id} 

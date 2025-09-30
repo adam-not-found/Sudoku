@@ -93,7 +93,10 @@
         to { clip-path: inset(0% 0 0 0); }
       }
       .animate-fill-up {
-        animation: fill-up 5s linear forwards;
+        /* The duration is set dynamically via inline styles */
+        animation-name: fill-up;
+        animation-timing-function: linear;
+        animation-fill-mode: forwards;
       }
 
       .text-shadow-blue-glow {
