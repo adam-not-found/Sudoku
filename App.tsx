@@ -12,8 +12,37 @@ import Controls from './components/CropPanel'; // Overwritten to be the Controls
 import { CellData } from './components/FilterPanel'; // Overwritten to be the Cell component
 import VictoryScreen from './components/VictoryScreen';
 import SettingsPanel from './components/SettingsPanel';
+import StatsPanel from './components/StatsPanel';
 
 type AnimationState = 'idle' | 'playing' | 'finished';
+
+export interface DifficultyStats {
+  wins: number;
+  bestTime: number | null; // in ms
+  totalTime: number; // in ms
+}
+
+export interface Stats {
+  gamesPlayed: number;
+  gamesWon: number;
+  totalMoves: number;
+  totalMistakes: number;
+  byDifficulty: Record<Difficulty, DifficultyStats>;
+}
+
+const initialStats: Stats = {
+  gamesPlayed: 0,
+  gamesWon: 0,
+  totalMoves: 0,
+  totalMistakes: 0,
+  byDifficulty: {
+    easy: { wins: 0, bestTime: null, totalTime: 0 },
+    medium: { wins: 0, bestTime: null, totalTime: 0 },
+    hard: { wins: 0, bestTime: null, totalTime: 0 },
+    professional: { wins: 0, bestTime: null, totalTime: 0 },
+  },
+};
+
 
 const victoryMessages = [
   // Marvel Cinematic Universe
@@ -65,6 +94,7 @@ const victoryMessages = [
 ];
 
 const SAVED_GAME_KEY = 'sudoku-saved-game';
+const SUDOKU_STATS_KEY = 'sudoku-stats';
 
 // Custom JSON replacer to handle Set serialization.
 const serializeSets = (key: string, value: any) => {
@@ -106,6 +136,7 @@ const App: React.FC = () => {
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
   const [victoryMessage, setVictoryMessage] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>(
     () => (localStorage.getItem('sudoku-difficulty') as Difficulty) || 'medium'
   );
@@ -122,6 +153,16 @@ const App: React.FC = () => {
     const savedMode = localStorage.getItem('sudoku-dark-mode');
     if (savedMode) return savedMode === 'true';
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  });
+  
+  const [stats, setStats] = useState<Stats>(() => {
+    try {
+      const savedStats = localStorage.getItem(SUDOKU_STATS_KEY);
+      return savedStats ? JSON.parse(savedStats) : initialStats;
+    } catch (e) {
+      console.error("Error loading stats:", e);
+      return initialStats;
+    }
   });
 
   // State for hint visuals and logic
@@ -163,6 +204,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
   }, [isAutoNotesEnabled]);
+  
+  useEffect(() => {
+    localStorage.setItem(SUDOKU_STATS_KEY, JSON.stringify(stats));
+  }, [stats]);
 
   useEffect(() => {
     localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
@@ -190,13 +235,38 @@ const App: React.FC = () => {
 
   const triggerWinState = useCallback(() => {
     const randomMessage = victoryMessages[Math.floor(Math.random() * victoryMessages.length)];
+    const gameDuration = Date.now() - startTime;
+    
+    setStats(prev => {
+        const difficultyStats = prev.byDifficulty[difficulty];
+        
+        const newBestTime = difficultyStats.bestTime === null || gameDuration < difficultyStats.bestTime 
+          ? gameDuration 
+          : difficultyStats.bestTime;
+          
+        return {
+          ...prev,
+          gamesWon: prev.gamesWon + 1,
+          totalMoves: prev.totalMoves + movesCount,
+          totalMistakes: prev.totalMistakes + mistakesCount,
+          byDifficulty: {
+            ...prev.byDifficulty,
+            [difficulty]: {
+              wins: difficultyStats.wins + 1,
+              bestTime: newBestTime,
+              totalTime: difficultyStats.totalTime + gameDuration,
+            }
+          }
+        };
+      });
+
     setVictoryMessage(randomMessage);
     setIsGameWon(true);
     setEndTime(Date.now());
     setSelectedCell(null);
     clearAllHintEffects();
     localStorage.removeItem(SAVED_GAME_KEY); // Clear saved game on win
-  }, [clearAllHintEffects]);
+  }, [clearAllHintEffects, startTime, difficulty, movesCount, mistakesCount]);
 
   const checkWinCondition = useCallback((currentBoard: CellData[][]) => {
     if (solution.length === 0) return false;
@@ -229,6 +299,12 @@ const App: React.FC = () => {
 
   const startNewGame = useCallback((gameDifficulty: Difficulty) => {
     const { puzzle: newPuzzle, solution: newSolution } = generateSudoku(gameDifficulty);
+    
+    setStats(prev => ({
+        ...prev,
+        gamesPlayed: prev.gamesPlayed + 1,
+    }));
+    
     setPuzzle(newPuzzle);
     setSolution(newSolution);
 
@@ -654,11 +730,11 @@ const App: React.FC = () => {
     setRedoHistory([]);
     setBoard(newBoard);
   };
-
+  
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isGameWon || isSettingsOpen) return;
+      if (isGameWon || isSettingsOpen || isStatsOpen) return;
 
       if (!selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         setSelectedCell({ row: 0, col: 0 });
@@ -709,7 +785,7 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen]);
+  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen, isStatsOpen]);
 
   if (board.length === 0 || solution.length === 0) {
     return <div className="flex items-center justify-center min-h-screen">Generating Puzzle...</div>;
@@ -730,16 +806,19 @@ const App: React.FC = () => {
   const highlightedNumber = selectedCell && board[selectedCell.row][selectedCell.col].value > 0
     ? board[selectedCell.row][selectedCell.col].value
     : null;
+    
+  const isUIBlocked = isSettingsOpen || isStatsOpen;
 
   return (
     <div className={`min-h-screen font-sans relative`} onClick={() => setSelectedCell(null)}>
        <Header 
           isDarkMode={isDarkMode} 
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenStats={() => setIsStatsOpen(true)}
           onNewGame={() => startNewGame(difficulty)}
         />
       <div className={`min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-32 pb-4 sm:pb-8 px-4`}>
-        <main className={`w-full max-w-lg flex flex-col items-center gap-4 sm:gap-6 transition-all duration-300 ${isSettingsOpen ? 'blur-sm pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
+        <main className={`w-full max-w-lg flex flex-col items-center gap-4 sm:gap-6 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
           {/* Sudoku Board Section */}
           <div className="relative w-full">
             {animationState !== 'idle' && (
@@ -829,6 +908,12 @@ const App: React.FC = () => {
         onSetAutoNotes={handleSetAutoNotes}
         isHighlightNotesEnabled={isHighlightNotesEnabled}
         onSetHighlightNotes={setIsHighlightNotesEnabled}
+      />
+      <StatsPanel
+        isOpen={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        stats={stats}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

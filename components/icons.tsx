@@ -63,3 +63,9 @@ export const NewGameIcon: React.FC = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 3v5h-5" />
     </svg>
 );
+
+export const StatsIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V8m4 8V4m4 12V6" />
+    </svg>
+);

@@ -23,7 +23,7 @@ const difficulties: { id: Difficulty; label: string }[] = [
   { id: 'easy', label: 'Easy' },
   { id: 'medium', label: 'Medium' },
   { id: 'hard', label: 'Hard' },
-  { id: 'professional', label: 'Professional' },
+  { id: 'professional', label: 'Pro' },
 ];
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ 
