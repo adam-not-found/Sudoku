@@ -118,1636 +118,1565 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="text/babel" data-presets="react,typescript" data-type="module">
-      /**
-       * @license
-       * SPDX-License-Identifier: Apache-2.0
-      */
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
 
-      import React, { useState, useEffect, useCallback, useRef } from 'react';
-      import ReactDOM from 'react-dom/client';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 
-      // ===============================================
-      // START OF INLINED: services/sudokuGenerator.ts
-      // ===============================================
-      const shuffle = (array) => {
-        for (let i = array.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-      };
+// From services/sudokuGenerator.ts
+const shuffle = (array) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
 
-      const isSafe = (grid, row, col, num) => {
-        for (let x = 0; x < 9; x++) {
-          if (grid[row][x] === num) return false;
-        }
-        for (let x = 0; x < 9; x++) {
-          if (grid[x][col] === num) return false;
-        }
-        const startRow = row - (row % 3);
-        const startCol = col - (col % 3);
-        for (let i = 0; i < 3; i++) {
-          for (let j = 0; j < 3; j++) {
-            if (grid[i + startRow][j + startCol] === num) return false;
+const isSafe = (grid, row, col, num) => {
+  for (let x = 0; x < 9; x++) {
+    if (grid[row][x] === num) return false;
+  }
+  for (let x = 0; x < 9; x++) {
+    if (grid[x][col] === num) return false;
+  }
+  const startRow = row - (row % 3);
+  const startCol = col - (col % 3);
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      if (grid[i + startRow][j + startCol] === num) return false;
+    }
+  }
+  return true;
+};
+
+const solveGrid = (grid) => {
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      if (grid[row][col] === 0) {
+        const numbers = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        for (const num of numbers) {
+          if (isSafe(grid, row, col, num)) {
+            grid[row][col] = num;
+            if (solveGrid(grid)) return true;
+            grid[row][col] = 0;
           }
         }
-        return true;
-      };
+        return false;
+      }
+    }
+  }
+  return true;
+};
 
-      const solveGrid = (grid) => {
-        for (let row = 0; row < 9; row++) {
-          for (let col = 0; col < 9; col++) {
-            if (grid[row][col] === 0) {
-              const numbers = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-              for (const num of numbers) {
-                if (isSafe(grid, row, col, num)) {
-                  grid[row][col] = num;
-                  if (solveGrid(grid)) return true;
-                  grid[row][col] = 0;
+const DIFFICULTY_LEVELS = {
+  easy: 40,
+  medium: 48,
+  hard: 54,
+  professional: 58,
+};
+
+const generateSudoku = (difficulty = 'medium') => {
+  const solution = Array(9).fill(0).map(() => Array(9).fill(0));
+  solveGrid(solution);
+  const puzzle = solution.map(row => [...row]);
+  let attempts = DIFFICULTY_LEVELS[difficulty] ?? 48;
+  while (attempts > 0) {
+    let row = Math.floor(Math.random() * 9);
+    let col = Math.floor(Math.random() * 9);
+    if (puzzle[row][col] !== 0) {
+      puzzle[row][col] = 0;
+      attempts--;
+    }
+  }
+  return { puzzle, solution };
+};
+
+// From components/icons.tsx
+const UndoIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <g transform="translate(2, 2)">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 15v-3.375A4.125 4.125 0 0010.875 7.5H4.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 11.25L4.5 7.5l3.75-3.75" />
+    </g>
+  </svg>
+);
+
+const EraseIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const NotesIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+  </svg>
+);
+
+const bulbPath = "M12 2.25c-4.142 0-7.5 3.358-7.5 7.5 0 2.434 1.157 4.583 2.963 5.992v3.008a.75.75 0 00.75.75h7.584a.75.75 0 00.75-.75v-3.008c1.806-1.409 2.963-3.558 2.963-5.992 0-4.142-3.358-7.5-7.5-7.5zM9.75 21a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H9.75z";
+
+const HintIconFull = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d={bulbPath} />
+  </svg>
+);
+
+const HintIconEmpty = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d={bulbPath} />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+const StatsIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V8m4 8V4m4 12V6" />
+    </svg>
+);
+
+
+// From components/Cell.tsx
+const { useState, useEffect, useRef } = React;
+
+function usePrevious(value) {
+  const ref = useRef(undefined);
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+}
+
+const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintTarget, hintEffect, rowIndex, colIndex, className = '' }) => {
+  const { value, isInitial, isWrong, userNotes, autoNotes, eliminatedNotes } = data;
+
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [isPopAnimating, setIsPopAnimating] = useState(false);
+  const prevValue = usePrevious(value);
+
+  useEffect(() => {
+    if (isWrong && value !== 0 && value !== prevValue) {
+      setIsAnimating(true);
+    }
+    if (isCorrect && !isInitial && value !== 0 && value !== prevValue) {
+      setIsPopAnimating(true);
+    }
+  }, [value, isWrong, isCorrect, isInitial, prevValue]);
+  
+  const handleAnimationEnd = () => {
+    setIsAnimating(false);
+    setIsPopAnimating(false);
+  };
+
+  const getCellClasses = () => {
+    const classParts = [
+      'aspect-square flex items-center justify-center text-2xl sm:text-3xl font-sans transition-all duration-200',
+      'cursor-pointer',
+    ];
+
+    let backgroundClass = '';
+    let textClass = '';
+    let fontClass = '';
+    let hoverClass = '';
+
+    const determineTextColor = () => {
+      if (isInitial) {
+        fontClass = 'font-semibold';
+        return isDarkMode ? 'text-slate-100' : 'text-slate-800';
+      }
+      if (isWrong) {
+        return isDarkMode ? 'text-red-400' : 'text-red-500';
+      }
+      if (isCorrect) {
+        fontClass = 'font-semibold';
+      }
+      return isDarkMode ? 'text-sky-400' : 'text-sky-600';
+    };
+
+    textClass = determineTextColor();
+    
+    if (isSelected) {
+      backgroundClass = isDarkMode ? 'bg-sky-800 z-10' : 'bg-sky-200 z-10';
+      hoverClass = '';
+    } else {
+      if (isDarkMode) {
+        hoverClass = isInitial ? 'hover:bg-slate-700/80' : 'hover:bg-sky-900/50';
+        if (isHintTarget) backgroundClass = 'bg-amber-500/50';
+        else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-800/60';
+        else if (isPeer) backgroundClass = 'bg-slate-700';
+        else backgroundClass = 'bg-slate-800';
+      } else {
+        hoverClass = isInitial ? 'hover:bg-slate-200/80' : 'hover:bg-sky-100';
+        if (isHintTarget) backgroundClass = 'bg-amber-300/80';
+        else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-100';
+        else if (isPeer) backgroundClass = 'bg-slate-100';
+        else backgroundClass = 'bg-white';
+      }
+    }
+    
+    classParts.push(backgroundClass, textClass, fontClass, hoverClass);
+    return classParts.filter(Boolean).join(' ');
+  };
+
+  const isHintGlowTarget = hintEffect?.type === 'cell-glow' && hintEffect.cell.row === rowIndex && hintEffect.cell.col === colIndex;
+  const shakeAnimationClass = isAnimating ? 'animate-shake' : '';
+  const hintAnimationClass = isHintGlowTarget ? 'animate-hint-cell' : '';
+  const cellClasses = `${getCellClasses()} ${shakeAnimationClass} ${hintAnimationClass} ${className}`;
+  const popAnimationClass = isPopAnimating ? 'animate-pop inline-block' : '';
+  
+  const hasUserOrAutoNotes = userNotes.size > 0 || autoNotes.size > 0;
+  const hasEliminationNotes = eliminatedNotes.size > 0;
+  const shouldShowNotesGrid = value === 0 && (hasUserOrAutoNotes || hasEliminationNotes);
+  const shouldDimValue = isNotesMode && !isInitial && !isCorrect;
+
+  return (
+    <div className={cellClasses} onClick={onClick} onAnimationEnd={handleAnimationEnd}>
+      {value !== 0 ? (
+        <span className={`${popAnimationClass} transition-opacity duration-300 ${shouldDimValue ? 'opacity-70' : ''}`}>{value}</span>
+      ) : shouldShowNotesGrid ? (
+        <div className={`grid grid-cols-3 grid-rows-3 w-full h-full p-px text-[10px] sm:text-xs leading-none text-transparent`}>
+          {Array.from({ length: 9 }).map((_, i) => {
+            const num = i + 1;
+            const isUserNote = userNotes.has(num);
+            const isAutoNote = autoNotes.has(num);
+            const isEliminationNote = eliminatedNotes.has(num);
+            const isNewlyEliminated = hintEffect?.type === 'note-pop' &&
+                                    hintEffect.cell.row === rowIndex &&
+                                    hintEffect.cell.col === colIndex &&
+                                    hintEffect.notes.includes(num);
+
+            const isNoteVisible = isUserNote || isAutoNote || isEliminationNote;
+            if (!isNoteVisible) return <div key={i} />;
+            
+            const isTheHighlightedNote = isHighlighted && highlightedNumber === num;
+            
+            let noteClass = '';
+            let fontWeightClass = '';
+            let textShadowClass = '';
+            let noteAnimationClass = '';
+
+            if (isEliminationNote) {
+              noteClass = isDarkMode ? 'text-red-400' : 'text-red-500';
+              fontWeightClass = 'font-semibold';
+              if (isNewlyEliminated) {
+                noteAnimationClass = 'animate-pop';
+              }
+            } else if (isTheHighlightedNote) {
+              noteClass = isDarkMode 
+                ? 'bg-sky-500/60 text-white rounded-sm' 
+                : 'bg-sky-200 text-sky-800 rounded-sm';
+              fontWeightClass = 'font-bold';
+            } else {
+              if (isAutoNotesEnabled) {
+                if (isUserNote) {
+                  noteClass = isDarkMode ? 'text-sky-500' : 'text-sky-500';
+                } else {
+                  noteClass = isDarkMode ? 'text-slate-500' : 'text-slate-400';
+                }
+              } else {
+                noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+              }
+
+              if (isNotesMode) {
+                fontWeightClass = 'font-bold';
+                if (isAutoNotesEnabled && isUserNote) {
+                  textShadowClass = 'text-shadow-blue-glow';
+                }
+              } else {
+                if (isUserNote || !isAutoNotesEnabled) {
+                  fontWeightClass = 'font-medium';
                 }
               }
-              return false;
             }
-          }
-        }
-        return true;
-      };
+            
+            return (
+              <div key={i} className={`flex items-center justify-center transition-all duration-200 ${noteClass} ${fontWeightClass} ${textShadowClass} ${noteAnimationClass}`}>
+                {num}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        ''
+      )}
+    </div>
+  );
+};
 
-      const DIFFICULTY_LEVELS = {
-        easy: 40,
-        medium: 48,
-        hard: 54,
-        professional: 58,
-      };
+// From components/SudokuBoard.tsx
+const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell, hintEffect }) => {
+  const isDark = isDarkMode || forceDarkMode;
+  const borderColor = isDark ? 'border-slate-600' : 'border-slate-300';
+  const thickInnerBorderColor = isDark ? 'bg-slate-500' : 'bg-slate-400';
+  const thinInnerBorderColor = isDark ? 'bg-slate-700/65' : 'bg-slate-200';
 
-      const generateSudoku = (difficulty = 'medium') => {
-        const solution = Array(9).fill(0).map(() => Array(9).fill(0));
-        solveGrid(solution);
-        const puzzle = solution.map(row => [...row]);
-        let attempts = DIFFICULTY_LEVELS[difficulty] ?? 48;
-        while (attempts > 0) {
-          let row = Math.floor(Math.random() * 9);
-          let col = Math.floor(Math.random() * 9);
-          if (puzzle[row][col] !== 0) {
-            puzzle[row][col] = 0;
-            attempts--;
-          }
-        }
-        return { puzzle, solution };
-      };
-      // ===============================================
-      // END OF INLINED: services/sudokuGenerator.ts
-      // ===============================================
+  return (
+    <div className={`transition-all duration-300 ease-in-out aspect-square w-full ${isNotesMode ? 'scale-[1.03]' : ''}`}>
+      <div className={`rounded-2xl overflow-hidden h-full w-full border-[6px] ${borderColor}`}>
+        <div className={`grid grid-cols-3 grid-rows-3 gap-0.5 h-full w-full ${thickInnerBorderColor} rounded-lg overflow-hidden`}>
+          {Array.from({ length: 9 }).map((_, boxIndex) => {
+            const boxRowStart = Math.floor(boxIndex / 3) * 3;
+            const boxColStart = (boxIndex % 3) * 3;
+            
+            let boxCornerClass = '';
+            if (boxIndex === 0) boxCornerClass = 'rounded-tl-lg';
+            if (boxIndex === 2) boxCornerClass = 'rounded-tr-lg';
+            if (boxIndex === 6) boxCornerClass = 'rounded-bl-lg';
+            if (boxIndex === 8) boxCornerClass = 'rounded-br-lg';
 
-
-      // ===============================================
-      // START OF INLINED: components/icons.tsx
-      // ===============================================
-      const UndoIcon = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <g transform="translate(2, 2)">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 15v-3.375A4.125 4.125 0 0010.875 7.5H4.5" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 11.25L4.5 7.5l3.75-3.75" />
-          </g>
-        </svg>
-      );
-
-      const EraseIcon = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      );
-
-      const NotesIcon = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-        </svg>
-      );
-
-      const bulbPath = "M12 2.25c-4.142 0-7.5 3.358-7.5 7.5 0 2.434 1.157 4.583 2.963 5.992v3.008a.75.75 0 00.75.75h7.584a.75.75 0 00.75-.75v-3.008c1.806-1.409 2.963-3.558 2.963-5.992 0-4.142-3.358-7.5-7.5-7.5zM9.75 21a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H9.75z";
-
-      const HintIconFull = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d={bulbPath} />
-        </svg>
-      );
-
-      const HintIconEmpty = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d={bulbPath} />
-        </svg>
-      );
-
-      const SettingsIcon = () => (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      );
-
-      const StatsIcon = () => (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V8m4 8V4m4 12V6" />
-          </svg>
-      );
-      // ===============================================
-      // END OF INLINED: components/icons.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF INLINED: components/FilterPanel.tsx
-      // ===============================================
-      function usePrevious(value) {
-        const ref = useRef(undefined);
-        useEffect(() => {
-          ref.current = value;
-        });
-        return ref.current;
-      }
-
-      const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintTarget, hintEffect, rowIndex, colIndex, className = '' }) => {
-        const { value, isInitial, isWrong, userNotes, autoNotes, eliminatedNotes } = data;
-
-        const [isAnimating, setIsAnimating] = useState(false);
-        const [isPopAnimating, setIsPopAnimating] = useState(false);
-        const prevValue = usePrevious(value);
-
-        useEffect(() => {
-          if (isWrong && value !== 0 && value !== prevValue) {
-            setIsAnimating(true);
-          }
-          if (isCorrect && !isInitial && value !== 0 && value !== prevValue) {
-            setIsPopAnimating(true);
-          }
-        }, [value, isWrong, isCorrect, isInitial, prevValue]);
-        
-        const handleAnimationEnd = () => {
-          setIsAnimating(false);
-          setIsPopAnimating(false);
-        };
-
-        const getCellClasses = () => {
-          const classParts = [
-            'aspect-square flex items-center justify-center text-2xl sm:text-3xl font-sans transition-all duration-200',
-            'cursor-pointer',
-          ];
-
-          let backgroundClass = '';
-          let textClass = '';
-          let fontClass = '';
-          let hoverClass = '';
-
-          const determineTextColor = () => {
-            if (isInitial) {
-              fontClass = 'font-bold';
-              return isDarkMode ? 'text-slate-100' : 'text-slate-800';
-            }
-            if (isWrong) {
-              return isDarkMode ? 'text-red-400' : 'text-red-500';
-            }
-            if (isCorrect) {
-              fontClass = 'font-bold';
-            }
-            return isDarkMode ? 'text-sky-400' : 'text-sky-600';
-          };
-
-          textClass = determineTextColor();
-          
-          if (isSelected) {
-            backgroundClass = isDarkMode ? 'bg-sky-800 z-10' : 'bg-sky-200 z-10';
-            hoverClass = '';
-          } else {
-            if (isDarkMode) {
-              hoverClass = isInitial ? 'hover:bg-slate-700/80' : 'hover:bg-sky-900/50';
-              if (isHintTarget) backgroundClass = 'bg-amber-500/50';
-              else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-800/60';
-              else if (isPeer) backgroundClass = 'bg-slate-700';
-              else backgroundClass = 'bg-slate-800';
-            } else {
-              hoverClass = isInitial ? 'hover:bg-slate-200/80' : 'hover:bg-sky-100';
-              if (isHintTarget) backgroundClass = 'bg-amber-300/80';
-              else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-100';
-              else if (isPeer) backgroundClass = 'bg-slate-100';
-              else backgroundClass = 'bg-white';
-            }
-          }
-          
-          classParts.push(backgroundClass, textClass, fontClass, hoverClass);
-          return classParts.filter(Boolean).join(' ');
-        };
-
-        const isHintGlowTarget = hintEffect?.type === 'cell-glow' && hintEffect.cell.row === rowIndex && hintEffect.cell.col === colIndex;
-        const shakeAnimationClass = isAnimating ? 'animate-shake' : '';
-        const hintAnimationClass = isHintGlowTarget ? 'animate-hint-cell' : '';
-        const cellClasses = `${getCellClasses()} ${shakeAnimationClass} ${hintAnimationClass} ${className}`;
-        const popAnimationClass = isPopAnimating ? 'animate-pop inline-block' : '';
-        
-        const hasUserOrAutoNotes = userNotes.size > 0 || autoNotes.size > 0;
-        const hasEliminationNotes = eliminatedNotes.size > 0;
-        const shouldShowNotesGrid = value === 0 && (hasUserOrAutoNotes || hasEliminationNotes);
-        const shouldDimValue = isNotesMode && !isInitial && !isCorrect;
-
-        return (
-          <div className={cellClasses} onClick={onClick} onAnimationEnd={handleAnimationEnd}>
-            {value !== 0 ? (
-              <span className={`${popAnimationClass} transition-opacity duration-300 ${shouldDimValue ? 'opacity-70' : ''}`}>{value}</span>
-            ) : shouldShowNotesGrid ? (
-              <div className={`grid grid-cols-3 grid-rows-3 w-full h-full p-px text-[10px] sm:text-xs leading-none text-transparent`}>
-                {Array.from({ length: 9 }).map((_, i) => {
-                  const num = i + 1;
-                  const isUserNote = userNotes.has(num);
-                  const isAutoNote = autoNotes.has(num);
-                  const isEliminationNote = eliminatedNotes.has(num);
-                  const isNewlyEliminated = hintEffect?.type === 'note-pop' &&
-                                          hintEffect.cell.row === rowIndex &&
-                                          hintEffect.cell.col === colIndex &&
-                                          hintEffect.notes.includes(num);
-
-                  const isNoteVisible = isUserNote || isAutoNote || isEliminationNote;
-                  if (!isNoteVisible) return <div key={i} />;
+            return (
+              <div key={boxIndex} className={`grid grid-cols-3 grid-rows-3 gap-0.5 ${thinInnerBorderColor} ${boxCornerClass}`}>
+                {Array.from({ length: 9 }).map((_, cellInBoxIndex) => {
+                  const cellRow = Math.floor(cellInBoxIndex / 3);
+                  const cellCol = cellInBoxIndex % 3;
+                  const rowIndex = boxRowStart + cellRow;
+                  const colIndex = boxColStart + cellCol;
+                  const cellData = board[rowIndex][colIndex];
+                  const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                  const isPeer = selectedCell ? 
+                    (selectedCell.row === rowIndex || selectedCell.col === colIndex || 
+                    (Math.floor(selectedCell.row / 3) === Math.floor(rowIndex / 3) && Math.floor(selectedCell.col / 3) === Math.floor(colIndex / 3)))
+                    : false;
+                  const isCorrect = !cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex];
                   
-                  const isTheHighlightedNote = isHighlighted && highlightedNumber === num;
-                  
-                  let noteClass = '';
-                  let fontWeightClass = '';
-                  let textShadowClass = '';
-                  let noteAnimationClass = '';
-
-                  if (isEliminationNote) {
-                    noteClass = isDarkMode ? 'text-red-400' : 'text-red-500';
-                    fontWeightClass = 'font-semibold';
-                    if (isNewlyEliminated) {
-                      noteAnimationClass = 'animate-pop';
-                    }
-                  } else if (isTheHighlightedNote) {
-                    noteClass = isDarkMode 
-                      ? 'bg-sky-500/60 text-white rounded-sm' 
-                      : 'bg-sky-200 text-sky-800 rounded-sm';
-                    fontWeightClass = 'font-bold';
-                  } else {
-                    // Determine color based on Auto Notes setting
-                    if (isAutoNotesEnabled) {
-                      if (isUserNote) {
-                        // Auto Notes ON, user-added note -> BLUE
-                        noteClass = isDarkMode ? 'text-sky-500' : 'text-sky-500';
-                      } else {
-                        // Auto Notes ON, auto-generated note -> GRAY
-                        noteClass = isDarkMode ? 'text-slate-500' : 'text-slate-400';
-                      }
-                    } else {
-                      // Auto Notes OFF, all notes are considered user-added -> GRAY/BLACK
-                      noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-                    }
-
-                    // Determine font weight and text shadow based on Notes Mode
-                    if (isNotesMode) {
-                      fontWeightClass = 'font-bold';
-                      // Add glow only to user-added BLUE notes (when Auto Notes is on)
-                      if (isAutoNotesEnabled && isUserNote) {
-                        textShadowClass = 'text-shadow-blue-glow';
-                      }
-                    } else {
-                      // When notes mode is off, give "user notes" a distinct weight.
-                      // This applies to all notes when Auto Notes is off.
-                      if (isUserNote || !isAutoNotesEnabled) {
-                        fontWeightClass = 'font-medium';
-                      }
-                    }
+                  let isHighlighted = false;
+                  if (highlightedNumber !== null && !isSelected) {
+                    const isHighlightedByValue = cellData.value === highlightedNumber;
+                    const isHighlightedByNote =
+                      isHighlightNotesEnabled &&
+                      cellData.value === 0 &&
+                      (cellData.userNotes.has(highlightedNumber) || cellData.autoNotes.has(highlightedNumber));
+                    isHighlighted = isHighlightedByValue || isHighlightedByNote;
                   }
+
+                  const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
                   
+                  let cellCornerClass = '';
+                  if (rowIndex === 0 && colIndex === 0) cellCornerClass = 'rounded-tl-sm';
+                  if (rowIndex === 0 && colIndex === 8) cellCornerClass = 'rounded-tr-sm';
+                  if (rowIndex === 8 && colIndex === 0) cellCornerClass = 'rounded-bl-sm';
+                  if (rowIndex === 8 && colIndex === 8) cellCornerClass = 'rounded-br-sm';
+
                   return (
-                    <div key={i} className={`flex items-center justify-center transition-all duration-200 ${noteClass} ${fontWeightClass} ${textShadowClass} ${noteAnimationClass}`}>
-                      {num}
-                    </div>
+                    <Cell 
+                      key={`${rowIndex}-${colIndex}`}
+                      data={cellData}
+                      isSelected={isSelected}
+                      isPeer={isPeer && !isSelected}
+                      isHighlighted={isHighlighted}
+                      isCorrect={isCorrect}
+                      onClick={() => onCellClick(rowIndex, colIndex)}
+                      isDarkMode={isDark}
+                      isNotesMode={isNotesMode}
+                      className={cellCornerClass}
+                      isAutoNotesEnabled={isAutoNotesEnabled}
+                      highlightedNumber={highlightedNumber}
+                      isHintTarget={isHintTarget}
+                      hintEffect={hintEffect}
+                      rowIndex={rowIndex}
+                      colIndex={colIndex}
+                    />
                   );
                 })}
               </div>
-            ) : (
-              ''
-            )}
-          </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/FilterPanel.tsx
-      // ===============================================
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
+// From components/NumberPad.tsx
+const NumberPad = ({ onNumberClick, isNotesMode, isDarkMode }) => {
+  const containerBgClass = isNotesMode
+    ? (isDarkMode ? 'bg-slate-600' : 'bg-slate-700')
+    : (isDarkMode ? 'bg-slate-700' : 'bg-slate-800');
+  const buttonHoverFocusClass = isDarkMode
+    ? 'hover:bg-slate-600/80 focus:bg-slate-600'
+    : 'hover:bg-slate-700/80 focus:bg-slate-700';
+  const baseButtonClasses = `
+    transition-all duration-200 transform active:scale-90
+    text-slate-200 ${buttonHoverFocusClass}
+  `;
 
-      // ===============================================
-      // START OF INLINED: components/StartScreen.tsx
-      // ===============================================
-      const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell, hintEffect }) => {
-        const isDark = isDarkMode || forceDarkMode;
-        const borderColor = isDark ? 'border-slate-600' : 'border-slate-300';
-        const thickInnerBorderColor = isDark ? 'bg-slate-500' : 'bg-slate-400';
-        const thinInnerBorderColor = isDark ? 'bg-slate-700/65' : 'bg-slate-200';
-
+  return (
+    <div className={`rounded-full p-1 flex justify-around items-center w-full transition-all duration-300 shadow-lg ${containerBgClass}`}>
+      {Array.from({ length: 9 }).map((_, i) => {
+        const num = i + 1;
         return (
-          <div className={`transition-all duration-300 ease-in-out aspect-square w-full ${isNotesMode ? 'scale-[1.03]' : ''}`}>
-            <div className={`rounded-2xl overflow-hidden h-full w-full border-[6px] ${borderColor}`}>
-              <div className={`grid grid-cols-3 grid-rows-3 gap-0.5 h-full w-full ${thickInnerBorderColor} rounded-lg overflow-hidden`}>
-                {Array.from({ length: 9 }).map((_, boxIndex) => {
-                  const boxRowStart = Math.floor(boxIndex / 3) * 3;
-                  const boxColStart = (boxIndex % 3) * 3;
-                  
-                  let boxCornerClass = '';
-                  if (boxIndex === 0) boxCornerClass = 'rounded-tl-lg';
-                  if (boxIndex === 2) boxCornerClass = 'rounded-tr-lg';
-                  if (boxIndex === 6) boxCornerClass = 'rounded-bl-lg';
-                  if (boxIndex === 8) boxCornerClass = 'rounded-br-lg';
+          <button
+            key={num}
+            onClick={() => onNumberClick(num)}
+            className={`
+              w-12 h-12 sm:w-16 sm:h-16 
+              flex items-center justify-center
+              font-semibold text-3xl sm:text-4xl
+              rounded-full 
+              focus:outline-none 
+              ${baseButtonClasses}
+            `}
+            aria-label={`Enter number ${num}`}
+          >
+            {num}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
-                  return (
-                    <div key={boxIndex} className={`grid grid-cols-3 grid-rows-3 gap-0.5 ${thinInnerBorderColor} ${boxCornerClass}`}>
-                      {Array.from({ length: 9 }).map((_, cellInBoxIndex) => {
-                        const cellRow = Math.floor(cellInBoxIndex / 3);
-                        const cellCol = cellInBoxIndex % 3;
-                        const rowIndex = boxRowStart + cellRow;
-                        const colIndex = boxColStart + cellCol;
-                        const cellData = board[rowIndex][colIndex];
-                        const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
-                        const isPeer = selectedCell ? 
-                          (selectedCell.row === rowIndex || selectedCell.col === colIndex || 
-                          (Math.floor(selectedCell.row / 3) === Math.floor(rowIndex / 3) && Math.floor(selectedCell.col / 3) === Math.floor(colIndex / 3)))
-                          : false;
-                        const isCorrect = !cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex];
-                        
-                        let isHighlighted = false;
-                        if (highlightedNumber !== null && !isSelected) {
-                          const isHighlightedByValue = cellData.value === highlightedNumber;
-                          const isHighlightedByNote =
-                            isHighlightNotesEnabled &&
-                            cellData.value === 0 &&
-                            (cellData.userNotes.has(highlightedNumber) || cellData.autoNotes.has(highlightedNumber));
-                          isHighlighted = isHighlightedByValue || isHighlightedByNote;
-                        }
+// From components/Controls.tsx
+const Controls = ({ 
+  isNotesMode, 
+  onToggleNotesMode, 
+  onUndo, 
+  canUndo,
+  onHint, 
+  isHintOnCooldown,
+  cooldownDuration,
+  onDelete,
+  isDarkMode
+}) => {
+  const [animation, setAnimation] = useState(null);
+  const prevCooldown = useRef(isHintOnCooldown);
+  const animationKey = useRef(0);
 
-                        const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
-                        
-                        let cellCornerClass = '';
-                        if (rowIndex === 0 && colIndex === 0) cellCornerClass = 'rounded-tl-sm';
-                        if (rowIndex === 0 && colIndex === 8) cellCornerClass = 'rounded-tr-sm';
-                        if (rowIndex === 8 && colIndex === 0) cellCornerClass = 'rounded-bl-sm';
-                        if (rowIndex === 8 && colIndex === 8) cellCornerClass = 'rounded-br-sm';
+  useEffect(() => {
+    if (prevCooldown.current && !isHintOnCooldown) {
+      setAnimation('refill');
+    }
+    prevCooldown.current = isHintOnCooldown;
+  }, [isHintOnCooldown]);
+  
+  const handleHintClick = () => {
+    if (isHintOnCooldown) return;
+    animationKey.current += 1;
+    setAnimation('pop');
+    onHint();
+  };
 
-                        return (
-                          <Cell 
-                            key={`${rowIndex}-${colIndex}`}
-                            data={cellData}
-                            isSelected={isSelected}
-                            isPeer={isPeer && !isSelected}
-                            isHighlighted={isHighlighted}
-                            isCorrect={isCorrect}
-                            onClick={() => onCellClick(rowIndex, colIndex)}
-                            isDarkMode={isDark}
-                            isNotesMode={isNotesMode}
-                            className={cellCornerClass}
-                            isAutoNotesEnabled={isAutoNotesEnabled}
-                            highlightedNumber={highlightedNumber}
-                            isHintTarget={isHintTarget}
-                            hintEffect={hintEffect}
-                            rowIndex={rowIndex}
-                            colIndex={colIndex}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+  const baseButtonClasses = "w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 transform focus:outline-none active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-transparent";
+  const containerClasses = isDarkMode ? 'bg-slate-700' : 'bg-slate-800';
+  const iconButtonClasses = isDarkMode ? 'text-slate-300 hover:bg-slate-600/80' : 'text-slate-300 hover:bg-slate-700/80';
+  const hintIconClasses = isDarkMode ? 'text-amber-400' : 'text-amber-300';
+  const notesButtonDynamicClasses = isNotesMode 
+    ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' 
+    : iconButtonClasses;
+  const hintHoverClass = isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
+  const animationClass = animation === 'pop' ? 'animate-hint-pop' : animation === 'refill' ? 'animate-hint-refill' : '';
+
+  return (
+    <div className={`rounded-full p-2 flex justify-center items-center gap-2 shadow-lg transition-colors duration-300 ${containerClasses}`}>
+      <button 
+        onClick={onUndo}
+        disabled={!canUndo}
+        className={`${baseButtonClasses} ${iconButtonClasses}`}
+        aria-label="Undo last move"
+      >
+        <UndoIcon />
+      </button>
+      <button 
+        onClick={onDelete}
+        className={`${baseButtonClasses} ${iconButtonClasses}`}
+        aria-label="Delete number or notes"
+      >
+        <EraseIcon />
+      </button>
+      <button 
+        onClick={onToggleNotesMode}
+        className={`${baseButtonClasses} ${notesButtonDynamicClasses}`}
+        aria-label={`Toggle notes mode, currently ${isNotesMode ? 'on' : 'off'}`}
+      >
+        <NotesIcon />
+      </button>
+      <button 
+        onClick={handleHintClick}
+        disabled={isHintOnCooldown}
+        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${animationClass}`}
+        onAnimationEnd={() => setAnimation(null)}
+        aria-label={isHintOnCooldown ? "Hint is on cooldown" : "Get a hint"}
+      >
+        <div className="relative w-full h-full flex items-center justify-center">
+          {isHintOnCooldown ? (
+            <>
+              <HintIconEmpty />
+              <div
+                key={animationKey.current}
+                className="absolute w-full h-full animate-fill-up flex items-center justify-center"
+                style={{ animationDuration: `${cooldownDuration}s` }}
+              >
+                <HintIconFull />
               </div>
+            </>
+          ) : (
+            <HintIconFull />
+          )}
+        </div>
+      </button>
+    </div>
+  );
+};
+
+// From components/Header.tsx
+const Header = ({ isDarkMode, onOpenSettings, onOpenStats, onNewGame }) => {
+  const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
+  const menuRef = useRef(null);
+  const textColor = isDarkMode ? 'text-slate-100' : 'text-gray-800';
+  const buttonColor = isDarkMode 
+    ? 'text-slate-300 hover:bg-slate-700/80' 
+    : 'text-slate-600 hover:bg-slate-200/80';
+  const baseButtonClasses = `
+    flex items-center justify-center rounded-full transition-colors duration-300 
+    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500
+  `;
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+        if (menuRef.current && !menuRef.current.contains(event.target)) {
+            setShowNewGameConfirm(false);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleNewGameClick = () => {
+    onNewGame();
+    setShowNewGameConfirm(false);
+  };
+
+  return (
+    <header className="absolute top-2 left-0 right-0 w-full p-4 z-20">
+      <div className="relative w-full flex items-center justify-between h-12">
+        <div className="flex-1 flex justify-start">
+          <button
+            onClick={onOpenStats}
+            className={`w-12 h-12 ${baseButtonClasses} ${buttonColor}`}
+            aria-label="Open statistics"
+          >
+            <StatsIcon />
+          </button>
+        </div>
+        <div className="flex-1 flex justify-center">
+            <div className="relative" ref={menuRef}>
+                <h1 
+                    onClick={() => setShowNewGameConfirm(prev => !prev)}
+                    className={`text-3xl font-bold tracking-tight ${textColor} cursor-pointer select-none transition-colors hover:text-sky-400`}
+                    aria-haspopup="true"
+                    aria-expanded={showNewGameConfirm}
+                >
+                    Sudoku
+                </h1>
+                <div className={`
+                    absolute top-full left-1/2 -translate-x-1/2 mt-3
+                    transform transition-all duration-200 ease-out
+                    origin-top
+                    ${showNewGameConfirm ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}
+                `}>
+                    <button
+                        onClick={handleNewGameClick}
+                        className={`
+                            whitespace-nowrap font-semibold py-2 px-5 rounded-full shadow-lg
+                            ${isDarkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-white text-slate-700 hover:bg-slate-100'}
+                            transition-all active:scale-95
+                        `}
+                    >
+                        New Game
+                    </button>
+                </div>
             </div>
+        </div>
+        <div className="flex-1 flex justify-end">
+            <div className="flex items-center gap-1">
+                <button
+                    onClick={onOpenSettings}
+                    className={`w-12 h-12 ${baseButtonClasses} ${buttonColor}`}
+                    aria-label="Open settings"
+                >
+                    <SettingsIcon />
+                </button>
+            </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+// From components/VictoryScreen.tsx
+const StatItem = ({ label, value }) => (
+  <div className="flex flex-col items-center justify-center">
+    <span className="text-sm font-medium text-slate-600 uppercase tracking-wider">{label}</span>
+    <span className="text-3xl font-bold text-slate-900">{value}</span>
+  </div>
+);
+
+const VictoryScreen = ({ message, moves, time, mistakes }) => {
+  const [showContainer, setShowContainer] = useState(false);
+  const [showTitle, setShowTitle] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+
+  useEffect(() => {
+    const containerTimer = setTimeout(() => setShowContainer(true), 100);
+    const titleTimer = setTimeout(() => setShowTitle(true), 300);
+    const statsTimer = setTimeout(() => setShowStats(true), 500);
+    return () => {
+      clearTimeout(containerTimer);
+      clearTimeout(titleTimer);
+      clearTimeout(statsTimer);
+    };
+  }, []);
+
+  const getTitleSizeClass = () => {
+    if (message.length > 35) return 'text-xl sm:text-2xl';
+    if (message.length > 20) return 'text-2xl sm:text-3xl';
+    return 'text-3xl';
+  };
+
+  return (
+    <div className="absolute inset-0 z-[100] pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className={`
+            w-auto min-w-[320px] max-w-sm flex flex-col items-center justify-center gap-6
+            bg-sky-200/65 backdrop-blur p-8 rounded-2xl shadow-2xl
+            transition-all duration-500 ease-in-out
+            ${showContainer ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-4 scale-95'}
+          `}
+        >
+          <h2
+            className={`text-center font-bold text-slate-800 transition-all duration-500 ease-in-out ${getTitleSizeClass()} ${
+              showTitle ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+            }`}
+          >
+            {message}
+          </h2>
+          <div className={`
+            flex justify-center items-center gap-x-8 sm:gap-x-12
+            transition-all duration-500 ease-in-out
+            ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+          `}>
+            <StatItem label="Time" value={time} />
+            <StatItem label="Moves" value={moves} />
+            <StatItem label="Mistakes" value={mistakes} />
           </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/StartScreen.tsx
-      // ===============================================
+        </div>
+      </div>
+    </div>
+  );
+};
 
+// From components/SettingsPanel.tsx
+const settingsPanelDifficulties = [
+  { id: 'easy', label: 'Easy' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'hard', label: 'Hard' },
+  { id: 'professional', label: 'Pro' },
+];
 
-      // ===============================================
-      // START OF INLINED: components/AdjustmentPanel.tsx
-      // ===============================================
-      const NumberPad = ({ onNumberClick, isNotesMode, isDarkMode }) => {
-        const containerBgClass = isNotesMode
-          ? (isDarkMode ? 'bg-slate-600' : 'bg-slate-700')
-          : (isDarkMode ? 'bg-slate-700' : 'bg-slate-800');
-        const buttonHoverFocusClass = isDarkMode
-          ? 'hover:bg-slate-600/80 focus:bg-slate-600'
-          : 'hover:bg-slate-700/80 focus:bg-slate-700';
-        const baseButtonClasses = `
-          transition-all duration-200 transform active:scale-90
-          text-slate-200 ${buttonHoverFocusClass}
-        `;
+const SettingsPanel = ({ 
+  isOpen, 
+  onClose, 
+  currentDifficulty, 
+  isDarkMode, 
+  onToggleDarkMode, 
+  onFillBoard,
+  isAutoNotesEnabled,
+  onSetAutoNotes,
+  isHighlightNotesEnabled,
+  onSetHighlightNotes,
+}) => {
+  const [selectedDifficulty, setSelectedDifficulty] = useState(currentDifficulty);
 
-        return (
-          <div className={`rounded-full p-1 flex justify-around items-center w-full transition-all duration-300 shadow-lg ${containerBgClass}`}>
-            {Array.from({ length: 9 }).map((_, i) => {
-              const num = i + 1;
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedDifficulty(currentDifficulty);
+    }
+  }, [isOpen, currentDifficulty]);
+
+  if (!isOpen) return null;
+
+  const handleDone = () => onClose(selectedDifficulty);
+  const modalBgClass = isDarkMode ? 'bg-slate-800/90 border-slate-600 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm';
+  const modalTextClass = isDarkMode ? 'text-slate-100' : 'text-slate-800';
+  const doneButtonClass = isDarkMode ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white';
+  const sectionBgClass = isDarkMode ? 'bg-slate-700/50' : 'bg-slate-100';
+  const baseButtonClasses = 'w-full text-center font-semibold py-3 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2';
+  const selectedClasses = isDarkMode 
+    ? 'bg-sky-500 text-white shadow-md' 
+    : 'bg-sky-600 text-white shadow-md';
+  const unselectedClasses = isDarkMode 
+    ? 'bg-slate-700 hover:bg-slate-600' 
+    : 'bg-slate-200 hover:bg-slate-300';
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" aria-modal="true" role="dialog">
+      <div className={`
+        w-full max-w-md m-4 p-6 rounded-2xl shadow-2xl border
+        flex flex-col gap-6
+        transform transition-all duration-300 ease-in-out
+        ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+        ${modalBgClass} ${modalTextClass}
+      `}>
+        <h2 className="text-2xl font-bold text-center">Settings</h2>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-lg font-semibold mb-2">Difficulty</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {settingsPanelDifficulties.map(({ id, label }) => {
+              const isSelected = selectedDifficulty === id;
               return (
                 <button
-                  key={num}
-                  onClick={() => onNumberClick(num)}
-                  className={`
-                    w-12 h-12 sm:w-16 sm:h-16 
-                    flex items-center justify-center
-                    font-bold text-3xl sm:text-4xl
-                    rounded-full 
-                    focus:outline-none 
-                    ${baseButtonClasses}
-                  `}
-                  aria-label={`Enter number ${num}`}
+                  key={id}
+                  onClick={() => setSelectedDifficulty(id)}
+                  className={`${baseButtonClasses} ${isSelected ? selectedClasses : unselectedClasses}`}
+                  aria-pressed={isSelected}
                 >
-                  {num}
+                  {label}
                 </button>
               );
             })}
           </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/AdjustmentPanel.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF INLINED: components/CropPanel.tsx
-      // ===============================================
-      const Controls = ({ 
-        isNotesMode, 
-        onToggleNotesMode, 
-        onUndo, 
-        canUndo,
-        onHint, 
-        isHintOnCooldown,
-        cooldownDuration,
-        onDelete,
-        isDarkMode
-      }) => {
-        const [animation, setAnimation] = useState(null);
-        const prevCooldown = useRef(isHintOnCooldown);
-        const animationKey = useRef(0);
-
-        useEffect(() => {
-          if (prevCooldown.current && !isHintOnCooldown) {
-            setAnimation('refill');
-          }
-          prevCooldown.current = isHintOnCooldown;
-        }, [isHintOnCooldown]);
-        
-        const handleHintClick = () => {
-          if (isHintOnCooldown) return;
-          animationKey.current += 1;
-          setAnimation('pop');
-          onHint();
-        };
-
-        const baseButtonClasses = "w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 transform focus:outline-none active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-transparent";
-        const containerClasses = isDarkMode ? 'bg-slate-700' : 'bg-slate-800';
-        const iconButtonClasses = isDarkMode ? 'text-slate-300 hover:bg-slate-600/80' : 'text-slate-300 hover:bg-slate-700/80';
-        const hintIconClasses = isDarkMode ? 'text-amber-400' : 'text-amber-300';
-        const notesButtonDynamicClasses = isNotesMode 
-          ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' 
-          : iconButtonClasses;
-        const hintHoverClass = isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
-        const animationClass = animation === 'pop' ? 'animate-hint-pop' : animation === 'refill' ? 'animate-hint-refill' : '';
-
-        return (
-          <div className={`rounded-full p-2 flex justify-center items-center gap-2 shadow-lg transition-colors duration-300 ${containerClasses}`}>
-            <button 
-              onClick={onUndo}
-              disabled={!canUndo}
-              className={`${baseButtonClasses} ${iconButtonClasses}`}
-              aria-label="Undo last move"
-            >
-              <UndoIcon />
-            </button>
-            <button 
-              onClick={onDelete}
-              className={`${baseButtonClasses} ${iconButtonClasses}`}
-              aria-label="Delete number or notes"
-            >
-              <EraseIcon />
-            </button>
-            <button 
-              onClick={onToggleNotesMode}
-              className={`${baseButtonClasses} ${notesButtonDynamicClasses}`}
-              aria-label={`Toggle notes mode, currently ${isNotesMode ? 'on' : 'off'}`}
-            >
-              <NotesIcon />
-            </button>
-            <button 
-              onClick={handleHintClick}
-              disabled={isHintOnCooldown}
-              className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${animationClass}`}
-              onAnimationEnd={() => setAnimation(null)}
-              aria-label={isHintOnCooldown ? "Hint is on cooldown" : "Get a hint"}
-            >
-              <div className="relative w-full h-full flex items-center justify-center">
-                {isHintOnCooldown ? (
-                  <>
-                    <HintIconEmpty />
-                    <div
-                      key={animationKey.current}
-                      className="absolute w-full h-full animate-fill-up flex items-center justify-center"
-                      style={{ animationDuration: `${cooldownDuration}s` }}
-                    >
-                      <HintIconFull />
-                    </div>
-                  </>
-                ) : (
-                  <HintIconFull />
-                )}
-              </div>
-            </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-lg font-semibold mb-2">Gameplay</h3>
+          <div className={`p-4 rounded-lg ${sectionBgClass} flex flex-col gap-4`}>
+            <div className="flex justify-between items-center">
+              <label htmlFor="auto-notes-toggle" className="font-medium pr-4">
+                Auto Notes
+                <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Show all possible notes for empty cells.
+                </p>
+              </label>
+              <button
+                id="auto-notes-toggle"
+                onClick={() => onSetAutoNotes(!isAutoNotesEnabled)}
+                role="switch"
+                aria-checked={isAutoNotesEnabled}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isAutoNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isAutoNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
+            </div>
+            <div className="flex justify-between items-center">
+              <label htmlFor="highlight-notes-toggle" className="font-medium pr-4">
+                Highlight Notes
+                <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Also highlight notes matching the selected number.
+                </p>
+              </label>
+              <button
+                id="highlight-notes-toggle"
+                onClick={() => onSetHighlightNotes(!isHighlightNotesEnabled)}
+                role="switch"
+                aria-checked={isHighlightNotesEnabled}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isHighlightNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isHighlightNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
+            </div>
           </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/CropPanel.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF INLINED: components/Header.tsx
-      // ===============================================
-      const Header = ({ isDarkMode, onOpenSettings, onOpenStats, onNewGame }) => {
-        const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
-        const menuRef = useRef(null);
-        const textColor = isDarkMode ? 'text-slate-100' : 'text-gray-800';
-        const buttonColor = isDarkMode 
-          ? 'text-slate-300 hover:bg-slate-700/80' 
-          : 'text-slate-600 hover:bg-slate-200/80';
-        const baseButtonClasses = `
-          flex items-center justify-center rounded-full transition-colors duration-300 
-          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500
-        `;
-
-        useEffect(() => {
-          const handleClickOutside = (event) => {
-              if (menuRef.current && !menuRef.current.contains(event.target)) {
-                  setShowNewGameConfirm(false);
-              }
-          };
-          document.addEventListener('mousedown', handleClickOutside);
-          return () => {
-              document.removeEventListener('mousedown', handleClickOutside);
-          };
-        }, []);
-
-        const handleNewGameClick = () => {
-          onNewGame();
-          setShowNewGameConfirm(false);
-        };
-
-        return (
-          <header className="absolute top-2 left-0 right-0 w-full p-4 z-20">
-            <div className="relative w-full flex items-center justify-between h-12">
-              <div className="flex-1 flex justify-start">
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-lg font-semibold mb-2">Theme</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {['Light', 'Dark'].map((theme) => {
+              const isSelected = (theme === 'Light' && !isDarkMode) || (theme === 'Dark' && isDarkMode);
+              return (
                 <button
-                  onClick={onOpenStats}
-                  className={`w-12 h-12 ${baseButtonClasses} ${buttonColor}`}
-                  aria-label="Open statistics"
+                  key={theme}
+                  onClick={() => {
+                    if ((theme === 'Light' && isDarkMode) || (theme === 'Dark' && !isDarkMode)) {
+                      onToggleDarkMode();
+                    }
+                  }}
+                  className={`${baseButtonClasses} ${isSelected ? selectedClasses : unselectedClasses}`}
+                  aria-pressed={isSelected}
                 >
-                  <StatsIcon />
+                  {theme}
                 </button>
-              </div>
-              <div className="flex-1 flex justify-center">
-                  <div className="relative" ref={menuRef}>
-                      <h1 
-                          onClick={() => setShowNewGameConfirm(prev => !prev)}
-                          className={`text-3xl font-bold tracking-tight ${textColor} cursor-pointer select-none transition-colors hover:text-sky-400`}
-                          aria-haspopup="true"
-                          aria-expanded={showNewGameConfirm}
-                      >
-                          Sudoku
-                      </h1>
-                      <div className={`
-                          absolute top-full left-1/2 -translate-x-1/2 mt-3
-                          transform transition-all duration-200 ease-out
-                          origin-top
-                          ${showNewGameConfirm ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}
-                      `}>
-                          <button
-                              onClick={handleNewGameClick}
-                              className={`
-                                  whitespace-nowrap font-semibold py-2 px-5 rounded-full shadow-lg
-                                  ${isDarkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-white text-slate-700 hover:bg-slate-100'}
-                                  transition-all active:scale-95
-                              `}
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex justify-between items-center mt-2">
+          <button 
+            onClick={onFillBoard}
+            className={`text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+            aria-label="Fill board with solution"
+          >
+            I give up
+          </button>
+          <button
+            onClick={handleDone}
+            className={`font-bold py-2 px-6 rounded-lg shadow-md transition-colors ${doneButtonClass}`}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// From components/StatsPanel.tsx
+const statsPanelDifficulties = [
+  { id: 'easy', label: 'Easy' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'hard', label: 'Hard' },
+  { id: 'professional', label: 'Pro' },
+];
+
+const StatCard = ({ label, value, isDarkMode }) => (
+  <div className={`flex flex-col items-center justify-center p-3 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+    <span className={`text-3xl font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{value}</span>
+    <span className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{label}</span>
+  </div>
+);
+
+const formatStatsTime = (milliseconds) => {
+    if (milliseconds === null || milliseconds <= 0) return '-:--';
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const StatsPanel = ({ isOpen, onClose, stats, isDarkMode }) => {
+  const playedDifficulties = statsPanelDifficulties.filter(d => stats.byDifficulty[d.id].wins > 0);
+  const [activeTab, setActiveTab] = useState(null);
+
+  useEffect(() => {
+    const currentlyPlayed = statsPanelDifficulties.filter(d => stats.byDifficulty[d.id].wins > 0);
+    if (currentlyPlayed.length > 0) {
+      if (!activeTab || !currentlyPlayed.some(d => d.id === activeTab)) {
+        setActiveTab(currentlyPlayed[0].id);
+      }
+    } else {
+      setActiveTab(null);
+    }
+  }, [stats, activeTab]);
+
+  if (!isOpen) return null;
+  
+  const handleClose = () => onClose();
+  const modalBgClass = isDarkMode ? 'bg-slate-800/90 border-slate-600 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm';
+  const modalTextClass = isDarkMode ? 'text-slate-100' : 'text-slate-800';
+  const doneButtonClass = isDarkMode ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white';
+  const tabButtonBase = 'text-center font-semibold py-2 px-4 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 text-sm';
+  const tabSelectedClasses = isDarkMode 
+    ? 'bg-sky-500 text-white shadow-md' 
+    : 'bg-sky-600 text-white shadow-md';
+  const tabUnselectedClasses = isDarkMode 
+    ? 'bg-slate-700 hover:bg-slate-600' 
+    : 'bg-slate-200 hover:bg-slate-300';
+  
+  const winPercentage = stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
+  const avgMoves = stats.gamesWon > 0 ? (stats.totalMoves / stats.gamesWon).toFixed(1) : '0.0';
+  const avgMistakes = stats.gamesWon > 0 ? (stats.totalMistakes / stats.gamesWon).toFixed(1) : '0.0';
+
+  const currentDifficultyStats = activeTab ? stats.byDifficulty[activeTab] : null;
+  const averageTime = currentDifficultyStats && currentDifficultyStats.wins > 0 ? currentDifficultyStats.totalTime / currentDifficultyStats.wins : 0;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" aria-modal="true" role="dialog" onClick={handleClose}>
+      <div 
+        className={`
+            w-full max-w-md m-4 p-6 rounded-2xl shadow-2xl border
+            flex flex-col gap-6
+            transform transition-all duration-300 ease-in-out
+            ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+            ${modalBgClass} ${modalTextClass}
+        `}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-2xl font-bold text-center">Statistics</h2>
+        <>
+            <div className="grid grid-cols-4 gap-3 text-center">
+                <StatCard label="Played" value={stats.gamesPlayed} isDarkMode={isDarkMode}/>
+                <StatCard label="Win %" value={`${winPercentage}%`} isDarkMode={isDarkMode}/>
+                <StatCard label="Avg. Moves" value={avgMoves} isDarkMode={isDarkMode}/>
+                <StatCard label="Avg. Mistakes" value={avgMistakes} isDarkMode={isDarkMode}/>
+            </div>
+            {playedDifficulties.length > 0 && activeTab && currentDifficultyStats && (
+              <div className="flex flex-col gap-3">
+                  <div className="flex justify-center gap-2">
+                      {playedDifficulties.map(({ id, label }) => (
+                          <button 
+                              key={id} 
+                              onClick={() => setActiveTab(id)}
+                              className={`${tabButtonBase} ${activeTab === id ? tabSelectedClasses : tabUnselectedClasses}`}
+                              aria-pressed={activeTab === id}
                           >
-                              New Game
+                              {label}
+                          </button>
+                      ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                      <StatCard label="Wins" value={currentDifficultyStats.wins} isDarkMode={isDarkMode} />
+                      <StatCard label="Best Time" value={formatStatsTime(currentDifficultyStats.bestTime)} isDarkMode={isDarkMode} />
+                      <StatCard label="Avg. Time" value={formatStatsTime(averageTime)} isDarkMode={isDarkMode} />
+                  </div>
+              </div>
+            )}
+            <div className="flex justify-center items-center mt-2">
+              <button
+                onClick={handleClose}
+                className={`font-bold py-2 px-6 rounded-lg shadow-md transition-colors ${doneButtonClass}`}
+              >
+                Done
+              </button>
+            </div>
+        </>
+      </div>
+    </div>
+  );
+};
+
+
+// From App.tsx
+const { useCallback } = React;
+
+const initialStats = {
+  gamesPlayed: 0,
+  gamesWon: 0,
+  totalMoves: 0,
+  totalMistakes: 0,
+  byDifficulty: {
+    easy: { wins: 0, bestTime: null, totalTime: 0 },
+    medium: { wins: 0, bestTime: null, totalTime: 0 },
+    hard: { wins: 0, bestTime: null, totalTime: 0 },
+    professional: { wins: 0, bestTime: null, totalTime: 0 },
+  },
+};
+
+const victoryMessages = [
+  "Perfectly solved, as all grids should be.", "This solve was... inevitable.", "Numbers... Assemble.", "That's my secret: I'm always thinking.", "Dread it. Run from it. The numbers arrive all the same.", "The Logic is strong with this one.", "This is the way.", "These are the digits you're looking for.", "We will watch your career with great interest.", "I find your lack of empty cells... pleasing.", "True Jedi.", "Never tell me the odds!", "It's over, puzzle. I have the high ground.", "One grid to rule them all.", "My precious... solution.", "Not all those who ponder are lost.", "Looks like victory is back on the menu.", "One does not simply solve this grid... but you did.", "Mischief Managed.", "You're a wizard, solver.", "10 points for that solve!", "He who controls the numbers controls the grid.", "That's got to be the best solver I've ever seen.", "Pencils? Where we're going, we don't need pencils.", "Houston, we have a solution.", "Are you not entertained?!", "This puzzle has been terminated.", "Calculated.", "What a solve!", "This is Sudoku!", "Steeeerike!", "Home Run!", "Nice shot!", "The numbers, Mason! I figured them out!", "All your boxes are belong to us.",
+];
+
+const SAVED_GAME_KEY = 'sudoku-saved-game';
+const SUDOKU_STATS_KEY = 'sudoku-stats';
+
+const serializeSets = (key, value) => {
+  if (value instanceof Set) {
+    return { __dataType: 'Set', value: [...value] };
+  }
+  return value;
+};
+
+const deserializeSets = (key, value) => {
+  if (typeof value === 'object' && value !== null && value.__dataType === 'Set') {
+    return new Set(value.value);
+  }
+  return value;
+};
+
+const deepCopyBoard = (board) => {
+  return board.map(row => 
+    row.map(cell => ({
+      ...cell,
+      userNotes: new Set(cell.userNotes),
+      autoNotes: new Set(cell.autoNotes),
+      eliminatedNotes: new Set(cell.eliminatedNotes),
+    }))
+  );
+};
+
+const App = () => {
+  const [board, setBoard] = useState([]);
+  const [puzzle, setPuzzle] = useState([]);
+  const [solution, setSolution] = useState([]);
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [isNotesMode, setIsNotesMode] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [isGameWon, setIsGameWon] = useState(false);
+  const [animationState, setAnimationState] = useState('idle');
+  const [victoryMessage, setVictoryMessage] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [difficulty, setDifficulty] = useState(
+    () => (localStorage.getItem('sudoku-difficulty')) || 'medium'
+  );
+  const [isAutoNotesEnabled, setIsAutoNotesEnabled] = useState(
+    () => localStorage.getItem('sudoku-auto-notes') === 'true'
+  );
+  const [isHighlightNotesEnabled, setIsHighlightNotesEnabled] = useState(
+    () => localStorage.getItem('sudoku-highlight-notes') === 'true'
+  );
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('sudoku-dark-mode');
+    if (savedMode) return savedMode === 'true';
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  });
+  const [stats, setStats] = useState(() => {
+    try {
+      const savedStats = localStorage.getItem(SUDOKU_STATS_KEY);
+      return savedStats ? JSON.parse(savedStats) : initialStats;
+    } catch (e) {
+      console.error("Error loading stats:", e);
+      return initialStats;
+    }
+  });
+  const [hintTargetCell, setHintTargetCell] = useState(null);
+  const [activeHint, setActiveHint] = useState(null);
+  const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
+  const [hintUsageCount, setHintUsageCount] = useState(0);
+  const [hintCooldownDuration, setHintCooldownDuration] = useState(5);
+  const [hintEffect, setHintEffect] = useState(null);
+  const cooldownIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (hintEffect) {
+        const timer = setTimeout(() => setHintEffect(null), 800);
+        return () => clearTimeout(timer);
+    }
+  }, [hintEffect]);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const startCooldown = useCallback(() => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    const durations = [5, 10, 20, 30, 60];
+    const currentDuration = durations[Math.min(hintUsageCount, durations.length - 1)];
+    setHintCooldownDuration(currentDuration);
+    setIsHintOnCooldown(true);
+    let timer = currentDuration;
+    cooldownIntervalRef.current = window.setInterval(() => {
+      timer -= 1;
+      if (timer <= 0) {
+        clearInterval(cooldownIntervalRef.current);
+        setIsHintOnCooldown(false);
+      }
+    }, 1000);
+  }, [hintUsageCount]);
+
+  useEffect(() => {
+    document.body.classList.toggle('dark', isDarkMode);
+    localStorage.setItem('sudoku-dark-mode', String(isDarkMode));
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
+  }, [isAutoNotesEnabled]);
+  
+  useEffect(() => {
+    localStorage.setItem(SUDOKU_STATS_KEY, JSON.stringify(stats));
+  }, [stats]);
+
+  useEffect(() => {
+    localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
+  }, [isHighlightNotesEnabled]);
+
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const [movesCount, setMovesCount] = useState(0);
+  const [mistakesCount, setMistakesCount] = useState(0);
+  
+  const clearProgressiveHint = useCallback(() => setActiveHint(null), []);
+  const clearHintHighlights = useCallback(() => setHintTargetCell(null), []);
+  const clearAllHintEffects = useCallback(() => {
+    clearHintHighlights();
+    clearProgressiveHint();
+  }, [clearHintHighlights, clearProgressiveHint]);
+
+  const triggerWinState = useCallback(() => {
+    const randomMessage = victoryMessages[Math.floor(Math.random() * victoryMessages.length)];
+    const gameDuration = Date.now() - startTime;
+    
+    setStats(prev => {
+        const difficultyStats = prev.byDifficulty[difficulty];
+        const newBestTime = difficultyStats.bestTime === null || gameDuration < difficultyStats.bestTime 
+          ? gameDuration 
+          : difficultyStats.bestTime;
+        return {
+          ...prev,
+          gamesWon: prev.gamesWon + 1,
+          totalMoves: prev.totalMoves + movesCount,
+          totalMistakes: prev.totalMistakes + mistakesCount,
+          byDifficulty: {
+            ...prev.byDifficulty,
+            [difficulty]: {
+              wins: difficultyStats.wins + 1,
+              bestTime: newBestTime,
+              totalTime: difficultyStats.totalTime + gameDuration,
+            }
+          }
+        };
+      });
+
+    setVictoryMessage(randomMessage);
+    setIsGameWon(true);
+    setEndTime(Date.now());
+    setSelectedCell(null);
+    clearAllHintEffects();
+    localStorage.removeItem(SAVED_GAME_KEY);
+  }, [clearAllHintEffects, startTime, difficulty, movesCount, mistakesCount]);
+
+  const checkWinCondition = useCallback((currentBoard) => {
+    if (solution.length === 0) return false;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (currentBoard[r][c].value === 0 || currentBoard[r][c].value !== solution[r][c]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }, [solution]);
+  
+  const getCandidates = (currentBoard, row, col) => {
+      const candidates = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      const gridValues = currentBoard.map(r => r.map(c => c.value));
+      for (let i = 0; i < 9; i++) {
+          if (gridValues[row][i] !== 0) candidates.delete(gridValues[row][i]);
+          if (gridValues[i][col] !== 0) candidates.delete(gridValues[i][col]);
+      }
+      const boxStartRow = Math.floor(row / 3) * 3;
+      const boxStartCol = Math.floor(col / 3) * 3;
+      for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+          for (let j = boxStartCol; j < boxStartCol + 3; j++) {
+              if (gridValues[i][j] !== 0) candidates.delete(gridValues[i][j]);
+          }
+      }
+      return candidates;
+  };
+
+  const startNewGame = useCallback((gameDifficulty) => {
+    const { puzzle: newPuzzle, solution: newSolution } = generateSudoku(gameDifficulty);
+    
+    setStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
+    
+    setPuzzle(newPuzzle);
+    setSolution(newSolution);
+
+    let newBoard = newPuzzle.map(row =>
+      row.map(value => ({
+        value, isInitial: value !== 0, isWrong: false,
+        userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set(),
+      }))
+    );
+
+    if (isAutoNotesEnabled) {
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (newBoard[r][c].value === 0) {
+            newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
+          }
+        }
+      }
+    }
+
+    setBoard(newBoard);
+    setSelectedCell(null);
+    setIsNotesMode(false);
+    setHistory([]);
+    setIsGameWon(false);
+    setAnimationState('idle');
+    clearAllHintEffects();
+    
+    setIsHintOnCooldown(false);
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
+    setHintUsageCount(0);
+
+    setStartTime(Date.now());
+    setEndTime(0);
+    setMovesCount(0);
+    setMistakesCount(0);
+  }, [isAutoNotesEnabled, clearAllHintEffects]);
+
+  useEffect(() => {
+    const savedGameJson = localStorage.getItem(SAVED_GAME_KEY);
+    if (savedGameJson) {
+      try {
+        const savedGame = JSON.parse(savedGameJson, deserializeSets);
+        setBoard(savedGame.board);
+        setPuzzle(savedGame.puzzle);
+        setSolution(savedGame.solution);
+        setHistory(savedGame.history);
+        setStartTime(savedGame.startTime);
+        setMovesCount(savedGame.movesCount);
+        setMistakesCount(savedGame.mistakesCount);
+        setHintUsageCount(savedGame.hintUsageCount || 0);
+        if (savedGame.difficulty && savedGame.difficulty !== difficulty) {
+            setDifficulty(savedGame.difficulty);
+            localStorage.setItem('sudoku-difficulty', savedGame.difficulty);
+        }
+      } catch (e) {
+        console.error("Error loading saved game:", e);
+        localStorage.removeItem(SAVED_GAME_KEY);
+        startNewGame(difficulty);
+      }
+    } else {
+      startNewGame(difficulty);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (board.length === 0 || isGameWon) return;
+    const gameState = { board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, hintUsageCount };
+    localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(gameState, serializeSets));
+  }, [board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
+  
+  useEffect(() => {
+    if (isGameWon) {
+      setAnimationState('playing');
+      const timer = setTimeout(() => setAnimationState('finished'), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isGameWon]);
+
+  const handleCellClick = (row, col) => {
+    if (isGameWon) return;
+    if (hintTargetCell && hintTargetCell.row === row && hintTargetCell.col === col) {
+      clearHintHighlights();
+    }
+    if (activeHint && (activeHint.row !== row || activeHint.col !== col)) {
+        clearProgressiveHint();
+    }
+    if (selectedCell?.row === row && selectedCell?.col === col) {
+      setSelectedCell(null);
+    } else {
+      setSelectedCell({ row, col });
+    }
+  };
+
+  const placeNumberOnBoard = useCallback((row, col, num, isFromHint = false) => {
+    setHistory(prev => [...prev, board]);
+    clearAllHintEffects();
+    const newBoard = deepCopyBoard(board);
+    const cell = newBoard[row][col];
+    if (!isFromHint) setMovesCount(prev => prev + 1);
+    cell.value = num;
+    cell.userNotes.clear(); cell.autoNotes.clear(); cell.eliminatedNotes.clear();
+    const isCorrect = solution[row][col] === num;
+    cell.isWrong = !isCorrect;
+    if (!isCorrect && !isFromHint) setMistakesCount(prev => prev + 1);
+    if (isCorrect) {
+        for (let c = 0; c < 9; c++) { newBoard[row][c].userNotes.delete(num); newBoard[row][c].autoNotes.delete(num); }
+        for (let r = 0; r < 9; r++) { newBoard[r][col].userNotes.delete(num); newBoard[r][col].autoNotes.delete(num); }
+        const boxStartRow = Math.floor(row / 3) * 3;
+        const boxStartCol = Math.floor(col / 3) * 3;
+        for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+            for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                newBoard[r][c].userNotes.delete(num); newBoard[r][c].autoNotes.delete(num);
+            }
+        }
+        if (checkWinCondition(newBoard)) triggerWinState();
+    }
+    setBoard(newBoard);
+  }, [board, solution, clearAllHintEffects, checkWinCondition, triggerWinState]);
+
+  const handleNumberClick = useCallback((num) => {
+    if (!selectedCell || isGameWon || solution.length === 0) return;
+    const { row, col } = selectedCell;
+    const cellData = board[row][col];
+    if (cellData.isInitial) return;
+    if (isNotesMode) {
+        if (cellData.eliminatedNotes.has(num)) return;
+        if (!cellData.eliminatedNotes.has(num)) {
+            setHistory(prev => [...prev, board]);
+            clearAllHintEffects();
+            const newBoard = deepCopyBoard(board);
+            const cell = newBoard[row][col];
+            const isAdding = !cell.userNotes.has(num) && !cell.autoNotes.has(num);
+            if (isAdding) cell.userNotes.add(num);
+            else { cell.userNotes.delete(num); cell.autoNotes.delete(num); }
+            cell.value = 0;
+            setBoard(newBoard);
+        }
+    } else {
+        placeNumberOnBoard(row, col, num);
+    }
+  }, [board, isNotesMode, selectedCell, isGameWon, solution, clearAllHintEffects, placeNumberOnBoard]);
+  
+  const handleToggleNotesMode = useCallback(() => { if (!isGameWon) setIsNotesMode(prev => !prev); }, [isGameWon]);
+  const handleUndo = useCallback(() => {
+    if (history.length === 0 || isGameWon) return;
+    setBoard(history[history.length - 1]);
+    setHistory(history.slice(0, -1));
+    clearAllHintEffects();
+  }, [history, isGameWon, clearAllHintEffects]);
+
+  const handleDelete = useCallback(() => {
+    if (!selectedCell || isGameWon) return;
+    const { row, col } = selectedCell;
+    const cellToDelete = board[row][col];
+    if (cellToDelete.isInitial || (cellToDelete.value === 0 && cellToDelete.userNotes.size === 0 && cellToDelete.autoNotes.size === 0 && cellToDelete.eliminatedNotes.size === 0)) return;
+    setHistory(prev => [...prev, board]);
+    clearAllHintEffects();
+    const newBoard = deepCopyBoard(board);
+    const cell = newBoard[row][col];
+    cell.value = 0;
+    cell.userNotes.clear(); cell.autoNotes.clear(); cell.eliminatedNotes.clear();
+    cell.isWrong = false;
+    setBoard(newBoard);
+  }, [board, selectedCell, isGameWon, clearAllHintEffects]);
+
+  const handleHint = useCallback(() => {
+    if (isHintOnCooldown || isGameWon || solution.length === 0) return;
+    let hintActionTaken = false;
+    const isHintableCellSelected = selectedCell && !board[selectedCell.row][selectedCell.col].isInitial && board[selectedCell.row][selectedCell.col].value === 0;
+    if (isHintableCellSelected) {
+        const { row, col } = selectedCell;
+        const candidates = getCandidates(board, row, col);
+        const hasUsedHintOnCell = activeHint && activeHint.row === row && activeHint.col === col;
+        if (candidates.size === 1 || hasUsedHintOnCell) {
+            placeNumberOnBoard(row, col, solution[row][col], true);
+            hintActionTaken = true;
+        } else if (candidates.size > 1) {
+            clearAllHintEffects();
+            setActiveHint({ row, col, level: 1 });
+            const correctAnswer = solution[row][col];
+            const incorrectNotes = Array.from(candidates).filter(n => n !== correctAnswer);
+            const shuffled = incorrectNotes.sort(() => 0.5 - Math.random());
+            const notesToEliminate = shuffled.slice(0, Math.max(1, Math.ceil(shuffled.length / 2)));
+            setHintEffect({ type: 'note-pop', cell: { row, col }, notes: [...notesToEliminate] });
+            const newBoard = deepCopyBoard(board);
+            const cellToUpdate = newBoard[row][col];
+            notesToEliminate.forEach(num => {
+                cellToUpdate.eliminatedNotes.add(num);
+                cellToUpdate.userNotes.delete(num);
+                cellToUpdate.autoNotes.delete(num);
+            });
+            setHistory(prev => [...prev, board]);
+            setBoard(newBoard);
+            hintActionTaken = true;
+        }
+    } else {
+      let candidateCells = [];
+      for (let r = 0; r < 9; r++) { for (let c = 0; c < 9; c++) { if (board[r][c].value === 0) { const candidates = getCandidates(board, r, c); if (candidates.size > 0) candidateCells.push({ row: r, col: c, size: candidates.size }); } } }
+      if (candidateCells.length > 0) {
+        candidateCells.sort((a, b) => a.size - b.size);
+        const tiedCells = candidateCells.filter(cell => cell.size === candidateCells[0].size);
+        let bestCell = (tiedCells.length === 1) ? tiedCells[0] : (() => {
+            let maxScore = -1, scoredCell = null;
+            const gridValues = board.map(row => row.map(cell => cell.value));
+            for (const cell of tiedCells) {
+                let score = 0; const { row, col } = cell;
+                for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
+                for (let i = 0; i < 9; i++) { if (gridValues[i][col] !== 0) score++; }
+                const boxStartRow = Math.floor(row / 3) * 3, boxStartCol = Math.floor(col / 3) * 3;
+                for (let r = boxStartRow; r < boxStartRow + 3; r++) { for (let c = boxStartCol; c < boxStartCol + 3; c++) { if (gridValues[r][c] !== 0) score++; } }
+                if (score > maxScore) { maxScore = score; scoredCell = cell; }
+            }
+            return scoredCell;
+        })();
+        if (bestCell) {
+            clearAllHintEffects();
+            setHintTargetCell(bestCell);
+            setHintEffect({ type: 'cell-glow', cell: bestCell });
+            hintActionTaken = true;
+        }
+      }
+    }
+    if (hintActionTaken) {
+      startCooldown();
+      setHintUsageCount(prev => prev + 1);
+    }
+}, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, placeNumberOnBoard, clearAllHintEffects, startCooldown]);
+
+  const handleFillBoard = useCallback(() => {
+    if (solution.length === 0) return;
+    const solvedBoard = solution.map(row => row.map(value => ({
+      value, isInitial: false, isWrong: false,
+      userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set(),
+    })));
+    setBoard(solvedBoard);
+    triggerWinState();
+  }, [solution, triggerWinState]);
+
+  const handleFillBoardAndCloseSettings = () => {
+    setIsSettingsOpen(false);
+    setTimeout(() => handleFillBoard(), 300); 
+  };
+  
+  const handleCloseSettings = (newDifficulty) => {
+    setIsSettingsOpen(false);
+    if (newDifficulty !== difficulty) {
+      setDifficulty(newDifficulty);
+      localStorage.setItem('sudoku-difficulty', newDifficulty);
+      startNewGame(newDifficulty);
+    }
+  };
+
+  const handleSetAutoNotes = (enabled) => {
+    setIsAutoNotesEnabled(enabled);
+    const newBoard = deepCopyBoard(board);
+    if (enabled) {
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (newBoard[r][c].value === 0 && newBoard[r][c].userNotes.size === 0) {
+            newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
+          } else {
+            newBoard[r][c].autoNotes.clear();
+          }
+        }
+      }
+    } else {
+      newBoard.forEach(row => row.forEach(cell => cell.autoNotes.clear()));
+    }
+    setHistory(prev => [...prev, board]);
+    setBoard(newBoard);
+  };
+  
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (isGameWon || isSettingsOpen || isStatsOpen) return;
+      if (!selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        setSelectedCell({ row: 0, col: 0 });
+        event.preventDefault();
+        return;
+      }
+      if (!selectedCell) return;
+      const { row, col } = selectedCell;
+      switch (event.key) {
+        case 'ArrowUp': setSelectedCell({ row: Math.max(0, row - 1), col }); event.preventDefault(); break;
+        case 'ArrowDown': setSelectedCell({ row: Math.min(8, row + 1), col }); event.preventDefault(); break;
+        case 'ArrowLeft': setSelectedCell({ row, col: Math.max(0, col - 1) }); event.preventDefault(); break;
+        case 'ArrowRight': setSelectedCell({ row, col: Math.min(8, col + 1) }); event.preventDefault(); break;
+        case 'Backspace': case 'Delete': handleDelete(); event.preventDefault(); break;
+        case 'Escape': setSelectedCell(null); event.preventDefault(); break;
+        default:
+          const num = parseInt(event.key, 10);
+          if (!isNaN(num) && num >= 1 && num <= 9) handleNumberClick(num);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen, isStatsOpen]);
+
+  if (board.length === 0 || solution.length === 0) {
+    return <div className="flex items-center justify-center min-h-screen">Generating Puzzle...</div>;
+  }
+  
+  const formatTime = (milliseconds) => {
+    if (!milliseconds || milliseconds <= 0) return '0:00';
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const elapsedTime = endTime > 0 ? endTime - startTime : 0;
+  const highlightedNumber = selectedCell && board[selectedCell.row][selectedCell.col].value > 0
+    ? board[selectedCell.row][selectedCell.col].value : null;
+  const isUIBlocked = isSettingsOpen || isStatsOpen;
+
+  return (
+    <div className={`min-h-screen font-sans relative`} onClick={() => setSelectedCell(null)}>
+      <Header 
+          isDarkMode={isDarkMode} 
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenStats={() => setIsStatsOpen(true)}
+          onNewGame={() => startNewGame(difficulty)}
+        />
+      <div className={`min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-32 pb-4 sm:pb-8 px-4`}>
+        <main className={`w-full max-w-lg flex flex-col items-center gap-4 sm:gap-6 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
+          <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
+            {animationState !== 'idle' && (
+              <VictoryScreen 
+                message={victoryMessage}
+                moves={movesCount}
+                time={formatTime(elapsedTime)}
+                mistakes={mistakesCount}
+              />
+            )}
+            <SudokuBoard 
+              board={board}
+              solution={solution}
+              selectedCell={selectedCell}
+              onCellClick={handleCellClick}
+              isNotesMode={isNotesMode}
+              isDarkMode={isDarkMode}
+              forceDarkMode={isGameWon}
+              isAutoNotesEnabled={isAutoNotesEnabled}
+              isHighlightNotesEnabled={isHighlightNotesEnabled}
+              highlightedNumber={highlightedNumber}
+              hintTargetCell={hintTargetCell}
+              hintEffect={hintEffect}
+            />
+          </div>
+          <div className="relative w-full flex flex-col items-center gap-2">
+              <div className={`w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} onClick={(e) => e.stopPropagation()}>
+                  <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`}>
+                      <NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} />
+                  </div>
+              </div>
+              <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
+                  <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                      <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
+                          <Controls 
+                              isNotesMode={isNotesMode} onToggleNotesMode={handleToggleNotesMode} onUndo={handleUndo}
+                              canUndo={history.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown}
+                              cooldownDuration={hintCooldownDuration} onDelete={handleDelete} isDarkMode={isDarkMode}
+                          />
+                      </div>
+                  </div>
+                  <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}}>
+                      <div className="relative w-auto rounded-full p-1 shadow-lg bg-slate-800" onClick={(e) => e.stopPropagation()}>
+                          <button
+                              onClick={() => startNewGame(difficulty)}
+                              className="w-auto bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 flex items-center justify-center"
+                          >
+                              <span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>
+                                Play Again
+                              </span>
                           </button>
                       </div>
                   </div>
               </div>
-              <div className="flex-1 flex justify-end">
-                  <div className="flex items-center gap-1">
-                      <button
-                          onClick={onOpenSettings}
-                          className={`w-12 h-12 ${baseButtonClasses} ${buttonColor}`}
-                          aria-label="Open settings"
-                      >
-                          <SettingsIcon />
-                      </button>
-                  </div>
-              </div>
-            </div>
-          </header>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/Header.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF INLINED: components/VictoryScreen.tsx
-      // ===============================================
-      const StatItem = ({ label, value }) => (
-        <div className="flex flex-col items-center justify-center">
-          <span className="text-sm font-medium text-slate-600 uppercase tracking-wider">{label}</span>
-          <span className="text-3xl font-bold text-slate-900">{value}</span>
-        </div>
-      );
-
-      const VictoryScreen = ({ message, moves, time, mistakes }) => {
-        const [showContainer, setShowContainer] = useState(false);
-        const [showTitle, setShowTitle] = useState(false);
-        const [showStats, setShowStats] = useState(false);
-
-        useEffect(() => {
-          const containerTimer = setTimeout(() => setShowContainer(true), 100);
-          const titleTimer = setTimeout(() => setShowTitle(true), 300);
-          const statsTimer = setTimeout(() => setShowStats(true), 500);
-          return () => {
-            clearTimeout(containerTimer);
-            clearTimeout(titleTimer);
-            clearTimeout(statsTimer);
-          };
-        }, []);
-
-        const getTitleSizeClass = () => {
-          if (message.length > 35) return 'text-xl sm:text-2xl';
-          if (message.length > 20) return 'text-2xl sm:text-3xl';
-          return 'text-3xl';
-        };
-
-        return (
-          <div className="absolute inset-0 z-[100] pointer-events-none">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className={`
-                  w-auto min-w-[320px] max-w-sm flex flex-col items-center justify-center gap-6
-                  bg-sky-200/65 backdrop-blur p-8 rounded-2xl shadow-2xl
-                  transition-all duration-500 ease-in-out
-                  ${showContainer ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-4 scale-95'}
-                `}
-              >
-                <h2
-                  className={`text-center font-bold text-slate-800 transition-all duration-500 ease-in-out ${getTitleSizeClass()} ${
-                    showTitle ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
-                  }`}
-                >
-                  {message}
-                </h2>
-                <div className={`
-                  flex justify-center items-center gap-x-8 sm:gap-x-12
-                  transition-all duration-500 ease-in-out
-                  ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
-                `}>
-                  <StatItem label="Time" value={time} />
-                  <StatItem label="Moves" value={moves} />
-                  <StatItem label="Mistakes" value={mistakes} />
-                </div>
-              </div>
-            </div>
           </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/VictoryScreen.tsx
-      // ===============================================
+        </main>
+      </div>
+      <SettingsPanel
+        isOpen={isSettingsOpen} onClose={handleCloseSettings} currentDifficulty={difficulty}
+        isDarkMode={isDarkMode} onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        onFillBoard={handleFillBoardAndCloseSettings} isAutoNotesEnabled={isAutoNotesEnabled}
+        onSetAutoNotes={handleSetAutoNotes} isHighlightNotesEnabled={isHighlightNotesEnabled}
+        onSetHighlightNotes={setIsHighlightNotesEnabled}
+      />
+      <StatsPanel isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} stats={stats} isDarkMode={isDarkMode} />
+    </div>
+  );
+};
 
+// From index.tsx
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
 
-      // ===============================================
-      // START OF INLINED: components/SettingsPanel.tsx
-      // ===============================================
-      const settingsPanelDifficulties = [
-        { id: 'easy', label: 'Easy' },
-        { id: 'medium', label: 'Medium' },
-        { id: 'hard', label: 'Hard' },
-        { id: 'professional', label: 'Pro' },
-      ];
-
-      const SettingsPanel = ({ 
-        isOpen, 
-        onClose, 
-        currentDifficulty, 
-        isDarkMode, 
-        onToggleDarkMode, 
-        onFillBoard,
-        isAutoNotesEnabled,
-        onSetAutoNotes,
-        isHighlightNotesEnabled,
-        onSetHighlightNotes,
-      }) => {
-        const [selectedDifficulty, setSelectedDifficulty] = useState(currentDifficulty);
-
-        useEffect(() => {
-          if (isOpen) {
-            setSelectedDifficulty(currentDifficulty);
-          }
-        }, [isOpen, currentDifficulty]);
-
-        if (!isOpen) return null;
-
-        const handleDone = () => onClose(selectedDifficulty);
-        const modalBgClass = isDarkMode ? 'bg-slate-800/90 border-slate-600 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm';
-        const modalTextClass = isDarkMode ? 'text-slate-100' : 'text-slate-800';
-        const doneButtonClass = isDarkMode ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white';
-        const sectionBgClass = isDarkMode ? 'bg-slate-700/50' : 'bg-slate-100';
-        const baseButtonClasses = 'w-full text-center font-semibold py-3 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2';
-        const selectedClasses = isDarkMode 
-          ? 'bg-sky-500 text-white shadow-md' 
-          : 'bg-sky-600 text-white shadow-md';
-        const unselectedClasses = isDarkMode 
-          ? 'bg-slate-700 hover:bg-slate-600' 
-          : 'bg-slate-200 hover:bg-slate-300';
-
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" aria-modal="true" role="dialog">
-            <div className={`
-              w-full max-w-md m-4 p-6 rounded-2xl shadow-2xl border
-              flex flex-col gap-6
-              transform transition-all duration-300 ease-in-out
-              ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
-              ${modalBgClass} ${modalTextClass}
-            `}>
-              <h2 className="text-2xl font-bold text-center">Settings</h2>
-              <div className="flex flex-col gap-2">
-                <h3 className="text-lg font-semibold mb-2">Difficulty</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {settingsPanelDifficulties.map(({ id, label }) => {
-                    const isSelected = selectedDifficulty === id;
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => setSelectedDifficulty(id)}
-                        className={`${baseButtonClasses} ${isSelected ? selectedClasses : unselectedClasses}`}
-                        aria-pressed={isSelected}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <h3 className="text-lg font-semibold mb-2">Gameplay</h3>
-                <div className={`p-4 rounded-lg ${sectionBgClass} flex flex-col gap-4`}>
-                  <div className="flex justify-between items-center">
-                    <label htmlFor="auto-notes-toggle" className="font-medium pr-4">
-                      Auto Notes
-                      <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Show all possible notes for empty cells.
-                      </p>
-                    </label>
-                    <button
-                      id="auto-notes-toggle"
-                      onClick={() => onSetAutoNotes(!isAutoNotesEnabled)}
-                      role="switch"
-                      aria-checked={isAutoNotesEnabled}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isAutoNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isAutoNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-                      />
-                    </button>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <label htmlFor="highlight-notes-toggle" className="font-medium pr-4">
-                      Highlight Notes
-                      <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Also highlight notes matching the selected number.
-                      </p>
-                    </label>
-                    <button
-                      id="highlight-notes-toggle"
-                      onClick={() => onSetHighlightNotes(!isHighlightNotesEnabled)}
-                      role="switch"
-                      aria-checked={isHighlightNotesEnabled}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isHighlightNotesEnabled ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isHighlightNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <h3 className="text-lg font-semibold mb-2">Theme</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Light', 'Dark'].map((theme) => {
-                    const isSelected = (theme === 'Light' && !isDarkMode) || (theme === 'Dark' && isDarkMode);
-                    return (
-                      <button
-                        key={theme}
-                        onClick={() => {
-                          if ((theme === 'Light' && isDarkMode) || (theme === 'Dark' && !isDarkMode)) {
-                            onToggleDarkMode();
-                          }
-                        }}
-                        className={`${baseButtonClasses} ${isSelected ? selectedClasses : unselectedClasses}`}
-                        aria-pressed={isSelected}
-                      >
-                        {theme}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <button 
-                  onClick={onFillBoard}
-                  className={`text-sm font-medium transition-colors ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
-                  aria-label="Fill board with solution"
-                >
-                  I give up
-                </button>
-                <button
-                  onClick={handleDone}
-                  className={`font-bold py-2 px-6 rounded-lg shadow-md transition-colors ${doneButtonClass}`}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/SettingsPanel.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF INLINED: components/StatsPanel.tsx
-      // ===============================================
-      const statsPanelDifficulties = [
-        { id: 'easy', label: 'Easy' },
-        { id: 'medium', label: 'Medium' },
-        { id: 'hard', label: 'Hard' },
-        { id: 'professional', label: 'Pro' },
-      ];
-
-      const StatCard = ({ label, value, isDarkMode }) => (
-        <div className={`flex flex-col items-center justify-center p-3 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-          <span className={`text-3xl font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{value}</span>
-          <span className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{label}</span>
-        </div>
-      );
-
-      const formatStatsTime = (milliseconds) => {
-          if (milliseconds === null || milliseconds <= 0) return '-:--';
-          const totalSeconds = Math.floor(milliseconds / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-          return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      };
-
-      const StatsPanel = ({ isOpen, onClose, stats, isDarkMode }) => {
-        const playedDifficulties = statsPanelDifficulties.filter(d => stats.byDifficulty[d.id].wins > 0);
-        const [activeTab, setActiveTab] = useState(null);
-
-        useEffect(() => {
-          const currentlyPlayed = statsPanelDifficulties.filter(d => stats.byDifficulty[d.id].wins > 0);
-          if (currentlyPlayed.length > 0) {
-            if (!activeTab || !currentlyPlayed.some(d => d.id === activeTab)) {
-              setActiveTab(currentlyPlayed[0].id);
-            }
-          } else {
-            setActiveTab(null);
-          }
-        }, [stats, activeTab]);
-
-        if (!isOpen) return null;
-        
-        const handleClose = () => onClose();
-        const modalBgClass = isDarkMode ? 'bg-slate-800/90 border-slate-600 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm';
-        const modalTextClass = isDarkMode ? 'text-slate-100' : 'text-slate-800';
-        const doneButtonClass = isDarkMode ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white';
-        const tabButtonBase = 'text-center font-semibold py-2 px-4 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 text-sm';
-        const tabSelectedClasses = isDarkMode 
-          ? 'bg-sky-500 text-white shadow-md' 
-          : 'bg-sky-600 text-white shadow-md';
-        const tabUnselectedClasses = isDarkMode 
-          ? 'bg-slate-700 hover:bg-slate-600' 
-          : 'bg-slate-200 hover:bg-slate-300';
-        
-        const winPercentage = stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
-        const avgMoves = stats.gamesWon > 0 ? (stats.totalMoves / stats.gamesWon).toFixed(1) : '0.0';
-        const avgMistakes = stats.gamesWon > 0 ? (stats.totalMistakes / stats.gamesWon).toFixed(1) : '0.0';
-
-        const currentDifficultyStats = activeTab ? stats.byDifficulty[activeTab] : null;
-        const averageTime = currentDifficultyStats && currentDifficultyStats.wins > 0 ? currentDifficultyStats.totalTime / currentDifficultyStats.wins : 0;
-
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" aria-modal="true" role="dialog" onClick={handleClose}>
-            <div 
-              className={`
-                  w-full max-w-md m-4 p-6 rounded-2xl shadow-2xl border
-                  flex flex-col gap-6
-                  transform transition-all duration-300 ease-in-out
-                  ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
-                  ${modalBgClass} ${modalTextClass}
-              `}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-2xl font-bold text-center">Statistics</h2>
-              <>
-                  <div className="grid grid-cols-4 gap-3 text-center">
-                      <StatCard label="Played" value={stats.gamesPlayed} isDarkMode={isDarkMode}/>
-                      <StatCard label="Win %" value={`${winPercentage}%`} isDarkMode={isDarkMode}/>
-                      <StatCard label="Avg. Moves" value={avgMoves} isDarkMode={isDarkMode}/>
-                      <StatCard label="Avg. Mistakes" value={avgMistakes} isDarkMode={isDarkMode}/>
-                  </div>
-                  {playedDifficulties.length > 0 && activeTab && currentDifficultyStats && (
-                    <div className="flex flex-col gap-3">
-                        <div className="flex justify-center gap-2">
-                            {playedDifficulties.map(({ id, label }) => (
-                                <button 
-                                    key={id} 
-                                    onClick={() => setActiveTab(id)}
-                                    className={`${tabButtonBase} ${activeTab === id ? tabSelectedClasses : tabUnselectedClasses}`}
-                                    aria-pressed={activeTab === id}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                            <StatCard label="Wins" value={currentDifficultyStats.wins} isDarkMode={isDarkMode} />
-                            <StatCard label="Best Time" value={formatStatsTime(currentDifficultyStats.bestTime)} isDarkMode={isDarkMode} />
-                            <StatCard label="Avg. Time" value={formatStatsTime(averageTime)} isDarkMode={isDarkMode} />
-                        </div>
-                    </div>
-                  )}
-                  <div className="flex justify-center items-center mt-2">
-                    <button
-                      onClick={handleClose}
-                      className={`font-bold py-2 px-6 rounded-lg shadow-md transition-colors ${doneButtonClass}`}
-                    >
-                      Done
-                    </button>
-                  </div>
-              </>
-            </div>
-          </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: components/StatsPanel.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF INLINED: App.tsx
-      // ===============================================
-      const initialStats = {
-        gamesPlayed: 0,
-        gamesWon: 0,
-        totalMoves: 0,
-        totalMistakes: 0,
-        byDifficulty: {
-          easy: { wins: 0, bestTime: null, totalTime: 0 },
-          medium: { wins: 0, bestTime: null, totalTime: 0 },
-          hard: { wins: 0, bestTime: null, totalTime: 0 },
-          professional: { wins: 0, bestTime: null, totalTime: 0 },
-        },
-      };
-
-      const victoryMessages = [
-        "Perfectly solved, as all grids should be.", "This solve was... inevitable.", "Numbers... Assemble.", "That's my secret: I'm always thinking.", "Dread it. Run from it. The numbers arrive all the same.", "The Logic is strong with this one.", "This is the way.", "These are the digits you're looking for.", "We will watch your career with great interest.", "I find your lack of empty cells... pleasing.", "True Jedi.", "Never tell me the odds!", "It's over, puzzle. I have the high ground.", "One grid to rule them all.", "My precious... solution.", "Not all those who ponder are lost.", "Looks like victory is back on the menu.", "One does not simply solve this grid... but you did.", "Mischief Managed.", "You're a wizard, solver.", "10 points for that solve!", "He who controls the numbers controls the grid.", "That's got to be the best solver I've ever seen.", "Pencils? Where we're going, we don't need pencils.", "Houston, we have a solution.", "Are you not entertained?!", "This puzzle has been terminated.", "Calculated.", "What a solve!", "This is Sudoku!", "Steeeerike!", "Home Run!", "Nice shot!", "The numbers, Mason! I figured them out!", "All your boxes are belong to us.",
-      ];
-
-      const SAVED_GAME_KEY = 'sudoku-saved-game';
-      const SUDOKU_STATS_KEY = 'sudoku-stats';
-
-      const serializeSets = (key, value) => {
-        if (value instanceof Set) {
-          return { __dataType: 'Set', value: [...value] };
-        }
-        return value;
-      };
-
-      const deserializeSets = (key, value) => {
-        if (typeof value === 'object' && value !== null && value.__dataType === 'Set') {
-          return new Set(value.value);
-        }
-        return value;
-      };
-
-      const deepCopyBoard = (board) => {
-        return board.map(row => 
-          row.map(cell => ({
-            ...cell,
-            userNotes: new Set(cell.userNotes),
-            autoNotes: new Set(cell.autoNotes),
-            eliminatedNotes: new Set(cell.eliminatedNotes),
-          }))
-        );
-      };
-
-      const App = () => {
-        const [board, setBoard] = useState([]);
-        const [puzzle, setPuzzle] = useState([]);
-        const [solution, setSolution] = useState([]);
-        const [selectedCell, setSelectedCell] = useState(null);
-        const [isNotesMode, setIsNotesMode] = useState(false);
-        const [history, setHistory] = useState([]);
-        const [isGameWon, setIsGameWon] = useState(false);
-        const [animationState, setAnimationState] = useState('idle');
-        const [victoryMessage, setVictoryMessage] = useState('');
-        const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-        const [isStatsOpen, setIsStatsOpen] = useState(false);
-        const [difficulty, setDifficulty] = useState(
-          () => (localStorage.getItem('sudoku-difficulty')) || 'medium'
-        );
-        const [isAutoNotesEnabled, setIsAutoNotesEnabled] = useState(
-          () => localStorage.getItem('sudoku-auto-notes') === 'true'
-        );
-        const [isHighlightNotesEnabled, setIsHighlightNotesEnabled] = useState(
-          () => localStorage.getItem('sudoku-highlight-notes') === 'true'
-        );
-        const [isDarkMode, setIsDarkMode] = useState(() => {
-          const savedMode = localStorage.getItem('sudoku-dark-mode');
-          if (savedMode) return savedMode === 'true';
-          return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
-        });
-        const [stats, setStats] = useState(() => {
-          try {
-            const savedStats = localStorage.getItem(SUDOKU_STATS_KEY);
-            return savedStats ? JSON.parse(savedStats) : initialStats;
-          } catch (e) {
-            console.error("Error loading stats:", e);
-            return initialStats;
-          }
-        });
-        const [hintTargetCell, setHintTargetCell] = useState(null);
-        const [activeHint, setActiveHint] = useState(null);
-        const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
-        const [hintUsageCount, setHintUsageCount] = useState(0);
-        const [hintCooldownDuration, setHintCooldownDuration] = useState(5);
-        const [hintEffect, setHintEffect] = useState(null);
-        const cooldownIntervalRef = useRef(null);
-
-        useEffect(() => {
-          if (hintEffect) {
-              const timer = setTimeout(() => setHintEffect(null), 800);
-              return () => clearTimeout(timer);
-          }
-        }, [hintEffect]);
-
-        useEffect(() => {
-          return () => {
-            if (cooldownIntervalRef.current) {
-              clearInterval(cooldownIntervalRef.current);
-            }
-          };
-        }, []);
-
-        const startCooldown = useCallback(() => {
-          if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-          const durations = [5, 10, 20, 30, 60];
-          const currentDuration = durations[Math.min(hintUsageCount, durations.length - 1)];
-          setHintCooldownDuration(currentDuration);
-          setIsHintOnCooldown(true);
-          let timer = currentDuration;
-          cooldownIntervalRef.current = window.setInterval(() => {
-            timer -= 1;
-            if (timer <= 0) {
-              clearInterval(cooldownIntervalRef.current);
-              setIsHintOnCooldown(false);
-            }
-          }, 1000);
-        }, [hintUsageCount]);
-
-        useEffect(() => {
-          document.body.classList.toggle('dark', isDarkMode);
-          localStorage.setItem('sudoku-dark-mode', String(isDarkMode));
-        }, [isDarkMode]);
-
-        useEffect(() => {
-          localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
-        }, [isAutoNotesEnabled]);
-        
-        useEffect(() => {
-          localStorage.setItem(SUDOKU_STATS_KEY, JSON.stringify(stats));
-        }, [stats]);
-
-        useEffect(() => {
-          localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
-        }, [isHighlightNotesEnabled]);
-
-        const [startTime, setStartTime] = useState(0);
-        const [endTime, setEndTime] = useState(0);
-        const [movesCount, setMovesCount] = useState(0);
-        const [mistakesCount, setMistakesCount] = useState(0);
-        
-        const clearProgressiveHint = useCallback(() => setActiveHint(null), []);
-        const clearHintHighlights = useCallback(() => setHintTargetCell(null), []);
-        const clearAllHintEffects = useCallback(() => {
-          clearHintHighlights();
-          clearProgressiveHint();
-        }, [clearHintHighlights, clearProgressiveHint]);
-
-        const triggerWinState = useCallback(() => {
-          const randomMessage = victoryMessages[Math.floor(Math.random() * victoryMessages.length)];
-          const gameDuration = Date.now() - startTime;
-          
-          setStats(prev => {
-              const difficultyStats = prev.byDifficulty[difficulty];
-              const newBestTime = difficultyStats.bestTime === null || gameDuration < difficultyStats.bestTime 
-                ? gameDuration 
-                : difficultyStats.bestTime;
-              return {
-                ...prev,
-                gamesWon: prev.gamesWon + 1,
-                totalMoves: prev.totalMoves + movesCount,
-                totalMistakes: prev.totalMistakes + mistakesCount,
-                byDifficulty: {
-                  ...prev.byDifficulty,
-                  [difficulty]: {
-                    wins: difficultyStats.wins + 1,
-                    bestTime: newBestTime,
-                    totalTime: difficultyStats.totalTime + gameDuration,
-                  }
-                }
-              };
-            });
-
-          setVictoryMessage(randomMessage);
-          setIsGameWon(true);
-          setEndTime(Date.now());
-          setSelectedCell(null);
-          clearAllHintEffects();
-          localStorage.removeItem(SAVED_GAME_KEY);
-        }, [clearAllHintEffects, startTime, difficulty, movesCount, mistakesCount]);
-
-        const checkWinCondition = useCallback((currentBoard) => {
-          if (solution.length === 0) return false;
-          for (let r = 0; r < 9; r++) {
-            for (let c = 0; c < 9; c++) {
-              if (currentBoard[r][c].value === 0 || currentBoard[r][c].value !== solution[r][c]) {
-                return false;
-              }
-            }
-          }
-          return true;
-        }, [solution]);
-        
-        const getCandidates = (currentBoard, row, col) => {
-            const candidates = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-            const gridValues = currentBoard.map(r => r.map(c => c.value));
-            for (let i = 0; i < 9; i++) {
-                if (gridValues[row][i] !== 0) candidates.delete(gridValues[row][i]);
-                if (gridValues[i][col] !== 0) candidates.delete(gridValues[i][col]);
-            }
-            const boxStartRow = Math.floor(row / 3) * 3;
-            const boxStartCol = Math.floor(col / 3) * 3;
-            for (let i = boxStartRow; i < boxStartRow + 3; i++) {
-                for (let j = boxStartCol; j < boxStartCol + 3; j++) {
-                    if (gridValues[i][j] !== 0) candidates.delete(gridValues[i][j]);
-                }
-            }
-            return candidates;
-        };
-
-        const startNewGame = useCallback((gameDifficulty) => {
-          const { puzzle: newPuzzle, solution: newSolution } = generateSudoku(gameDifficulty);
-          
-          setStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
-          
-          setPuzzle(newPuzzle);
-          setSolution(newSolution);
-
-          let newBoard = newPuzzle.map(row =>
-            row.map(value => ({
-              value, isInitial: value !== 0, isWrong: false,
-              userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set(),
-            }))
-          );
-
-          if (isAutoNotesEnabled) {
-            for (let r = 0; r < 9; r++) {
-              for (let c = 0; c < 9; c++) {
-                if (newBoard[r][c].value === 0) {
-                  newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
-                }
-              }
-            }
-          }
-
-          setBoard(newBoard);
-          setSelectedCell(null);
-          setIsNotesMode(false);
-          setHistory([]);
-          setIsGameWon(false);
-          setAnimationState('idle');
-          clearAllHintEffects();
-          
-          setIsHintOnCooldown(false);
-          if (cooldownIntervalRef.current) {
-            clearInterval(cooldownIntervalRef.current);
-          }
-          setHintUsageCount(0);
-
-          setStartTime(Date.now());
-          setEndTime(0);
-          setMovesCount(0);
-          setMistakesCount(0);
-        }, [isAutoNotesEnabled, clearAllHintEffects]);
-
-        useEffect(() => {
-          const savedGameJson = localStorage.getItem(SAVED_GAME_KEY);
-          if (savedGameJson) {
-            try {
-              const savedGame = JSON.parse(savedGameJson, deserializeSets);
-              setBoard(savedGame.board);
-              setPuzzle(savedGame.puzzle);
-              setSolution(savedGame.solution);
-              setHistory(savedGame.history);
-              setStartTime(savedGame.startTime);
-              setMovesCount(savedGame.movesCount);
-              setMistakesCount(savedGame.mistakesCount);
-              setHintUsageCount(savedGame.hintUsageCount || 0);
-              if (savedGame.difficulty && savedGame.difficulty !== difficulty) {
-                  setDifficulty(savedGame.difficulty);
-                  localStorage.setItem('sudoku-difficulty', savedGame.difficulty);
-              }
-            } catch (e) {
-              console.error("Error loading saved game:", e);
-              localStorage.removeItem(SAVED_GAME_KEY);
-              startNewGame(difficulty);
-            }
-          } else {
-            startNewGame(difficulty);
-          }
-        }, []);
-
-        useEffect(() => {
-          if (board.length === 0 || isGameWon) return;
-          const gameState = { board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, hintUsageCount };
-          localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(gameState, serializeSets));
-        }, [board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
-        
-        useEffect(() => {
-          if (isGameWon) {
-            setAnimationState('playing');
-            const timer = setTimeout(() => setAnimationState('finished'), 1500);
-            return () => clearTimeout(timer);
-          }
-        }, [isGameWon]);
-
-        const handleCellClick = (row, col) => {
-          if (isGameWon) return;
-          if (hintTargetCell && hintTargetCell.row === row && hintTargetCell.col === col) {
-            clearHintHighlights();
-          }
-          if (activeHint && (activeHint.row !== row || activeHint.col !== col)) {
-              clearProgressiveHint();
-          }
-          if (selectedCell?.row === row && selectedCell?.col === col) {
-            setSelectedCell(null);
-          } else {
-            setSelectedCell({ row, col });
-          }
-        };
-
-        const placeNumberOnBoard = useCallback((row, col, num, isFromHint = false) => {
-          setHistory(prev => [...prev, board]);
-          clearAllHintEffects();
-          const newBoard = deepCopyBoard(board);
-          const cell = newBoard[row][col];
-          if (!isFromHint) setMovesCount(prev => prev + 1);
-          cell.value = num;
-          cell.userNotes.clear(); cell.autoNotes.clear(); cell.eliminatedNotes.clear();
-          const isCorrect = solution[row][col] === num;
-          cell.isWrong = !isCorrect;
-          if (!isCorrect && !isFromHint) setMistakesCount(prev => prev + 1);
-          if (isCorrect) {
-              for (let c = 0; c < 9; c++) { newBoard[row][c].userNotes.delete(num); newBoard[row][c].autoNotes.delete(num); }
-              for (let r = 0; r < 9; r++) { newBoard[r][col].userNotes.delete(num); newBoard[r][col].autoNotes.delete(num); }
-              const boxStartRow = Math.floor(row / 3) * 3;
-              const boxStartCol = Math.floor(col / 3) * 3;
-              for (let r = boxStartRow; r < boxStartRow + 3; r++) {
-                  for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-                      newBoard[r][c].userNotes.delete(num); newBoard[r][c].autoNotes.delete(num);
-                  }
-              }
-              if (checkWinCondition(newBoard)) triggerWinState();
-          }
-          setBoard(newBoard);
-        }, [board, solution, clearAllHintEffects, checkWinCondition, triggerWinState]);
-
-        const handleNumberClick = useCallback((num) => {
-          if (!selectedCell || isGameWon || solution.length === 0) return;
-          const { row, col } = selectedCell;
-          const cellData = board[row][col];
-          if (cellData.isInitial) return;
-          if (isNotesMode) {
-              if (cellData.eliminatedNotes.has(num)) return;
-              if (!cellData.eliminatedNotes.has(num)) {
-                  setHistory(prev => [...prev, board]);
-                  clearAllHintEffects();
-                  const newBoard = deepCopyBoard(board);
-                  const cell = newBoard[row][col];
-                  const isAdding = !cell.userNotes.has(num) && !cell.autoNotes.has(num);
-                  if (isAdding) cell.userNotes.add(num);
-                  else { cell.userNotes.delete(num); cell.autoNotes.delete(num); }
-                  cell.value = 0;
-                  setBoard(newBoard);
-              }
-          } else {
-              placeNumberOnBoard(row, col, num);
-          }
-        }, [board, isNotesMode, selectedCell, isGameWon, solution, clearAllHintEffects, placeNumberOnBoard]);
-        
-        const handleToggleNotesMode = useCallback(() => { if (!isGameWon) setIsNotesMode(prev => !prev); }, [isGameWon]);
-        const handleUndo = useCallback(() => {
-          if (history.length === 0 || isGameWon) return;
-          setBoard(history[history.length - 1]);
-          setHistory(history.slice(0, -1));
-          clearAllHintEffects();
-        }, [history, isGameWon, clearAllHintEffects]);
-
-        const handleDelete = useCallback(() => {
-          if (!selectedCell || isGameWon) return;
-          const { row, col } = selectedCell;
-          const cellToDelete = board[row][col];
-          if (cellToDelete.isInitial || (cellToDelete.value === 0 && cellToDelete.userNotes.size === 0 && cellToDelete.autoNotes.size === 0 && cellToDelete.eliminatedNotes.size === 0)) return;
-          setHistory(prev => [...prev, board]);
-          clearAllHintEffects();
-          const newBoard = deepCopyBoard(board);
-          const cell = newBoard[row][col];
-          cell.value = 0;
-          cell.userNotes.clear(); cell.autoNotes.clear(); cell.eliminatedNotes.clear();
-          cell.isWrong = false;
-          setBoard(newBoard);
-        }, [board, selectedCell, isGameWon, clearAllHintEffects]);
-
-        const handleHint = useCallback(() => {
-          if (isHintOnCooldown || isGameWon || solution.length === 0) return;
-          let hintActionTaken = false;
-          const isHintableCellSelected = selectedCell && !board[selectedCell.row][selectedCell.col].isInitial && board[selectedCell.row][selectedCell.col].value === 0;
-          if (isHintableCellSelected) {
-              const { row, col } = selectedCell;
-              const candidates = getCandidates(board, row, col);
-              const hasUsedHintOnCell = activeHint && activeHint.row === row && activeHint.col === col;
-              if (candidates.size === 1 || hasUsedHintOnCell) {
-                  placeNumberOnBoard(row, col, solution[row][col], true);
-                  hintActionTaken = true;
-              } else if (candidates.size > 1) {
-                  clearAllHintEffects();
-                  setActiveHint({ row, col, level: 1 });
-                  const correctAnswer = solution[row][col];
-                  const incorrectNotes = Array.from(candidates).filter(n => n !== correctAnswer);
-                  const shuffled = incorrectNotes.sort(() => 0.5 - Math.random());
-                  const notesToEliminate = shuffled.slice(0, Math.max(1, Math.ceil(shuffled.length / 2)));
-                  setHintEffect({ type: 'note-pop', cell: { row, col }, notes: [...notesToEliminate] });
-                  const newBoard = deepCopyBoard(board);
-                  const cellToUpdate = newBoard[row][col];
-                  notesToEliminate.forEach(num => {
-                      cellToUpdate.eliminatedNotes.add(num);
-                      cellToUpdate.userNotes.delete(num);
-                      cellToUpdate.autoNotes.delete(num);
-                  });
-                  setHistory(prev => [...prev, board]);
-                  setBoard(newBoard);
-                  hintActionTaken = true;
-              }
-          } else {
-            let candidateCells = [];
-            for (let r = 0; r < 9; r++) { for (let c = 0; c < 9; c++) { if (board[r][c].value === 0) { const candidates = getCandidates(board, r, c); if (candidates.size > 0) candidateCells.push({ row: r, col: c, size: candidates.size }); } } }
-            if (candidateCells.length > 0) {
-              candidateCells.sort((a, b) => a.size - b.size);
-              const tiedCells = candidateCells.filter(cell => cell.size === candidateCells[0].size);
-              let bestCell = (tiedCells.length === 1) ? tiedCells[0] : (() => {
-                  let maxScore = -1, scoredCell = null;
-                  const gridValues = board.map(row => row.map(cell => cell.value));
-                  for (const cell of tiedCells) {
-                      let score = 0; const { row, col } = cell;
-                      for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
-                      for (let i = 0; i < 9; i++) { if (gridValues[i][col] !== 0) score++; }
-                      const boxStartRow = Math.floor(row / 3) * 3, boxStartCol = Math.floor(col / 3) * 3;
-                      for (let r = boxStartRow; r < boxStartRow + 3; r++) { for (let c = boxStartCol; c < boxStartCol + 3; c++) { if (gridValues[r][c] !== 0) score++; } }
-                      if (score > maxScore) { maxScore = score; scoredCell = cell; }
-                  }
-                  return scoredCell;
-              })();
-              if (bestCell) {
-                  clearAllHintEffects();
-                  setHintTargetCell(bestCell);
-                  setHintEffect({ type: 'cell-glow', cell: bestCell });
-                  hintActionTaken = true;
-              }
-            }
-          }
-          if (hintActionTaken) {
-            startCooldown();
-            setHintUsageCount(prev => prev + 1);
-          }
-      }, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, placeNumberOnBoard, clearAllHintEffects, startCooldown]);
-
-        const handleFillBoard = useCallback(() => {
-          if (solution.length === 0) return;
-          const solvedBoard = solution.map(row => row.map(value => ({
-            value, isInitial: false, isWrong: false,
-            userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set(),
-          })));
-          setBoard(solvedBoard);
-          triggerWinState();
-        }, [solution, triggerWinState]);
-
-        const handleFillBoardAndCloseSettings = () => {
-          setIsSettingsOpen(false);
-          setTimeout(() => handleFillBoard(), 300); 
-        };
-        
-        const handleCloseSettings = (newDifficulty) => {
-          setIsSettingsOpen(false);
-          if (newDifficulty !== difficulty) {
-            setDifficulty(newDifficulty);
-            localStorage.setItem('sudoku-difficulty', newDifficulty);
-            startNewGame(newDifficulty);
-          }
-        };
-
-        const handleSetAutoNotes = (enabled) => {
-          setIsAutoNotesEnabled(enabled);
-          const newBoard = deepCopyBoard(board);
-          if (enabled) {
-            for (let r = 0; r < 9; r++) {
-              for (let c = 0; c < 9; c++) {
-                if (newBoard[r][c].value === 0 && newBoard[r][c].userNotes.size === 0) {
-                  newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
-                } else {
-                  newBoard[r][c].autoNotes.clear();
-                }
-              }
-            }
-          } else {
-            newBoard.forEach(row => row.forEach(cell => cell.autoNotes.clear()));
-          }
-          setHistory(prev => [...prev, board]);
-          setBoard(newBoard);
-        };
-        
-        useEffect(() => {
-          const handleKeyDown = (event) => {
-            if (isGameWon || isSettingsOpen || isStatsOpen) return;
-            if (!selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-              setSelectedCell({ row: 0, col: 0 });
-              event.preventDefault();
-              return;
-            }
-            if (!selectedCell) return;
-            const { row, col } = selectedCell;
-            switch (event.key) {
-              case 'ArrowUp': setSelectedCell({ row: Math.max(0, row - 1), col }); event.preventDefault(); break;
-              case 'ArrowDown': setSelectedCell({ row: Math.min(8, row + 1), col }); event.preventDefault(); break;
-              case 'ArrowLeft': setSelectedCell({ row, col: Math.max(0, col - 1) }); event.preventDefault(); break;
-              case 'ArrowRight': setSelectedCell({ row, col: Math.min(8, col + 1) }); event.preventDefault(); break;
-              case 'Backspace': case 'Delete': handleDelete(); event.preventDefault(); break;
-              case 'Escape': setSelectedCell(null); event.preventDefault(); break;
-              default:
-                const num = parseInt(event.key, 10);
-                if (!isNaN(num) && num >= 1 && num <= 9) handleNumberClick(num);
-                break;
-            }
-          };
-          window.addEventListener('keydown', handleKeyDown);
-          return () => window.removeEventListener('keydown', handleKeyDown);
-        }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isSettingsOpen, isStatsOpen]);
-
-        if (board.length === 0 || solution.length === 0) {
-          return <div className="flex items-center justify-center min-h-screen">Generating Puzzle...</div>;
-        }
-        
-        const formatTime = (milliseconds) => {
-          if (!milliseconds || milliseconds <= 0) return '0:00';
-          const totalSeconds = Math.floor(milliseconds / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-          return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        };
-
-        const elapsedTime = endTime > 0 ? endTime - startTime : 0;
-        const highlightedNumber = selectedCell && board[selectedCell.row][selectedCell.col].value > 0
-          ? board[selectedCell.row][selectedCell.col].value : null;
-        const isUIBlocked = isSettingsOpen || isStatsOpen;
-
-        return (
-          <div className={`min-h-screen font-sans relative`} onClick={() => setSelectedCell(null)}>
-            <Header 
-                isDarkMode={isDarkMode} 
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                onOpenStats={() => setIsStatsOpen(true)}
-                onNewGame={() => startNewGame(difficulty)}
-              />
-            <div className={`min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-32 pb-4 sm:pb-8 px-4`}>
-              <main className={`w-full max-w-lg flex flex-col items-center gap-4 sm:gap-6 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
-                <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
-                  {animationState !== 'idle' && (
-                    <VictoryScreen 
-                      message={victoryMessage}
-                      moves={movesCount}
-                      time={formatTime(elapsedTime)}
-                      mistakes={mistakesCount}
-                    />
-                  )}
-                  <SudokuBoard 
-                    board={board}
-                    solution={solution}
-                    selectedCell={selectedCell}
-                    onCellClick={handleCellClick}
-                    isNotesMode={isNotesMode}
-                    isDarkMode={isDarkMode}
-                    forceDarkMode={isGameWon}
-                    isAutoNotesEnabled={isAutoNotesEnabled}
-                    isHighlightNotesEnabled={isHighlightNotesEnabled}
-                    highlightedNumber={highlightedNumber}
-                    hintTargetCell={hintTargetCell}
-                    hintEffect={hintEffect}
-                  />
-                </div>
-                <div className={`relative w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} onClick={(e) => e.stopPropagation()}>
-                    <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`}>
-                        <NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} />
-                    </div>
-                </div>
-                <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
-                    <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                        <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
-                            <Controls 
-                                isNotesMode={isNotesMode} onToggleNotesMode={handleToggleNotesMode} onUndo={handleUndo}
-                                canUndo={history.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown}
-                                cooldownDuration={hintCooldownDuration} onDelete={handleDelete} isDarkMode={isDarkMode}
-                            />
-                        </div>
-                    </div>
-                    <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}}>
-                        <div className="relative w-auto rounded-full p-1 shadow-lg bg-slate-800" onClick={(e) => e.stopPropagation()}>
-                            <button
-                                onClick={() => startNewGame(difficulty)}
-                                className="w-auto bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 flex items-center justify-center"
-                            >
-                                <span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>
-                                  Play Again
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-              </main>
-            </div>
-            <SettingsPanel
-              isOpen={isSettingsOpen} onClose={handleCloseSettings} currentDifficulty={difficulty}
-              isDarkMode={isDarkMode} onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
-              onFillBoard={handleFillBoardAndCloseSettings} isAutoNotesEnabled={isAutoNotesEnabled}
-              onSetAutoNotes={handleSetAutoNotes} isHighlightNotesEnabled={isHighlightNotesEnabled}
-              onSetHighlightNotes={setIsHighlightNotesEnabled}
-            />
-            <StatsPanel isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} stats={stats} isDarkMode={isDarkMode} />
-          </div>
-        );
-      };
-      // ===============================================
-      // END OF INLINED: App.tsx
-      // ===============================================
-
-
-      // ===============================================
-      // START OF RENDER LOGIC
-      // ===============================================
-      const rootElement = document.getElementById('root');
-      if (!rootElement) {
-        throw new Error("Could not find root element to mount to");
-      }
-
-      const root = ReactDOM.createRoot(rootElement);
-      root.render(
-        <React.StrictMode>
-          <App />
-        </React.StrictMode>
-      );
-      // ===============================================
-      // END OF RENDER LOGIC
-      // ===============================================
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
     </script>
     <script>
       if ('serviceWorker' in navigator) {
