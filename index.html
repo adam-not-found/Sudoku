@@ -91,6 +91,15 @@
         animation: hint-refill-glow 0.3s ease-out;
       }
 
+      @keyframes hint-cell-glow {
+        0% { box-shadow: 0 0 0px 0px rgba(251, 191, 36, 0.7); }
+        50% { box-shadow: 0 0 12px 6px rgba(251, 191, 36, 0.7); }
+        100% { box-shadow: 0 0 0px 0px rgba(251, 191, 36, 0); }
+      }
+      .animate-hint-cell {
+        animation: hint-cell-glow 0.8s ease-out;
+      }
+
       @keyframes fill-up {
         from { clip-path: inset(100% 0 0 0); }
         to { clip-path: inset(0% 0 0 0); }
@@ -258,7 +267,7 @@
         return ref.current;
       }
 
-      const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintTarget, className = '' }) => {
+      const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintTarget, hintEffect, rowIndex, colIndex, className = '' }) => {
         const { value, isInitial, isWrong, userNotes, autoNotes, eliminatedNotes } = data;
 
         const [isAnimating, setIsAnimating] = useState(false);
@@ -281,7 +290,7 @@
 
         const getCellClasses = () => {
           const classParts = [
-            'aspect-square flex items-center justify-center text-xl sm:text-2xl font-sans transition-all duration-200',
+            'aspect-square flex items-center justify-center text-2xl sm:text-3xl font-sans transition-all duration-200',
             'cursor-pointer',
           ];
 
@@ -329,8 +338,10 @@
           return classParts.filter(Boolean).join(' ');
         };
 
+        const isHintGlowTarget = hintEffect?.type === 'cell-glow' && hintEffect.cell.row === rowIndex && hintEffect.cell.col === colIndex;
         const shakeAnimationClass = isAnimating ? 'animate-shake' : '';
-        const cellClasses = `${getCellClasses()} ${shakeAnimationClass} ${className}`;
+        const hintAnimationClass = isHintGlowTarget ? 'animate-hint-cell' : '';
+        const cellClasses = `${getCellClasses()} ${shakeAnimationClass} ${hintAnimationClass} ${className}`;
         const popAnimationClass = isPopAnimating ? 'animate-pop inline-block' : '';
         
         const hasUserOrAutoNotes = userNotes.size > 0 || autoNotes.size > 0;
@@ -349,6 +360,10 @@
                   const isUserNote = userNotes.has(num);
                   const isAutoNote = autoNotes.has(num);
                   const isEliminationNote = eliminatedNotes.has(num);
+                  const isNewlyEliminated = hintEffect?.type === 'note-pop' &&
+                                          hintEffect.cell.row === rowIndex &&
+                                          hintEffect.cell.col === colIndex &&
+                                          hintEffect.notes.includes(num);
 
                   const isNoteVisible = isUserNote || isAutoNote || isEliminationNote;
                   if (!isNoteVisible) return <div key={i} />;
@@ -358,47 +373,52 @@
                   let noteClass = '';
                   let fontWeightClass = '';
                   let textShadowClass = '';
+                  let noteAnimationClass = '';
 
                   if (isEliminationNote) {
                     noteClass = isDarkMode ? 'text-red-400' : 'text-red-500';
                     fontWeightClass = 'font-semibold';
+                    if (isNewlyEliminated) {
+                      noteAnimationClass = 'animate-pop';
+                    }
                   } else if (isTheHighlightedNote) {
                     noteClass = isDarkMode 
                       ? 'bg-sky-500/60 text-white rounded-sm' 
                       : 'bg-sky-200 text-sky-800 rounded-sm';
                     fontWeightClass = 'font-bold';
                   } else {
-                    if (!isAutoNotesEnabled) {
-                      if (isNotesMode) {
+                    // Determine color based on Auto Notes setting
+                    if (isAutoNotesEnabled) {
+                      if (isUserNote) {
+                        // Auto Notes ON, user-added note -> BLUE
                         noteClass = isDarkMode ? 'text-sky-500' : 'text-sky-500';
-                        fontWeightClass = 'font-bold';
-                        textShadowClass = 'text-shadow-blue-glow';
                       } else {
-                        noteClass = isDarkMode ? 'text-slate-300' : 'text-slate-500';
-                        fontWeightClass = 'font-medium';
+                        // Auto Notes ON, auto-generated note -> GRAY
+                        noteClass = isDarkMode ? 'text-slate-500' : 'text-slate-400';
                       }
                     } else {
-                      if (isNotesMode) {
-                        fontWeightClass = 'font-bold';
-                        if (isUserNote) {
-                          noteClass = isDarkMode ? 'text-sky-500' : 'text-sky-500';
-                          textShadowClass = 'text-shadow-blue-glow';
-                        } else {
-                          noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-400';
-                        }
-                      } else {
-                        if (isUserNote) {
-                          noteClass = isDarkMode ? 'text-sky-400' : 'text-sky-600';
-                          fontWeightClass = 'font-medium';
-                        } else {
-                          noteClass = isDarkMode ? 'text-slate-400' : 'text-gray-400';
-                        }
+                      // Auto Notes OFF, all notes are considered user-added -> GRAY/BLACK
+                      noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+                    }
+
+                    // Determine font weight and text shadow based on Notes Mode
+                    if (isNotesMode) {
+                      fontWeightClass = 'font-bold';
+                      // Add glow only to user-added BLUE notes (when Auto Notes is on)
+                      if (isAutoNotesEnabled && isUserNote) {
+                        textShadowClass = 'text-shadow-blue-glow';
+                      }
+                    } else {
+                      // When notes mode is off, give "user notes" a distinct weight.
+                      // This applies to all notes when Auto Notes is off.
+                      if (isUserNote || !isAutoNotesEnabled) {
+                        fontWeightClass = 'font-medium';
                       }
                     }
                   }
                   
                   return (
-                    <div key={i} className={`flex items-center justify-center transition-all duration-200 ${noteClass} ${fontWeightClass} ${textShadowClass}`}>
+                    <div key={i} className={`flex items-center justify-center transition-all duration-200 ${noteClass} ${fontWeightClass} ${textShadowClass} ${noteAnimationClass}`}>
                       {num}
                     </div>
                   );
@@ -418,82 +438,83 @@
       // ===============================================
       // START OF INLINED: components/StartScreen.tsx
       // ===============================================
-      const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell }) => {
+      const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell, hintEffect }) => {
         const isDark = isDarkMode || forceDarkMode;
-        const outerBorderColor = isDark ? 'bg-slate-600' : 'bg-slate-300';
+        const borderColor = isDark ? 'border-slate-600' : 'border-slate-300';
         const thickInnerBorderColor = isDark ? 'bg-slate-500' : 'bg-slate-400';
         const thinInnerBorderColor = isDark ? 'bg-slate-700/65' : 'bg-slate-200';
 
         return (
           <div className={`transition-all duration-300 ease-in-out aspect-square w-full ${isNotesMode ? 'scale-[1.03]' : ''}`}>
-            <div className="rounded-2xl overflow-hidden h-full w-full">
-              <div className={`p-1.5 h-full w-full ${outerBorderColor}`}> 
-                <div className={`grid grid-cols-3 grid-rows-3 gap-0.5 h-full w-full ${thickInnerBorderColor} rounded-lg overflow-hidden`}>
-                  {Array.from({ length: 9 }).map((_, boxIndex) => {
-                    const boxRowStart = Math.floor(boxIndex / 3) * 3;
-                    const boxColStart = (boxIndex % 3) * 3;
-                    
-                    let boxCornerClass = '';
-                    if (boxIndex === 0) boxCornerClass = 'rounded-tl';
-                    if (boxIndex === 2) boxCornerClass = 'rounded-tr';
-                    if (boxIndex === 6) boxCornerClass = 'rounded-bl';
-                    if (boxIndex === 8) boxCornerClass = 'rounded-br';
+            <div className={`rounded-2xl overflow-hidden h-full w-full border-[6px] ${borderColor}`}>
+              <div className={`grid grid-cols-3 grid-rows-3 gap-0.5 h-full w-full ${thickInnerBorderColor} rounded-lg overflow-hidden`}>
+                {Array.from({ length: 9 }).map((_, boxIndex) => {
+                  const boxRowStart = Math.floor(boxIndex / 3) * 3;
+                  const boxColStart = (boxIndex % 3) * 3;
+                  
+                  let boxCornerClass = '';
+                  if (boxIndex === 0) boxCornerClass = 'rounded-tl-lg';
+                  if (boxIndex === 2) boxCornerClass = 'rounded-tr-lg';
+                  if (boxIndex === 6) boxCornerClass = 'rounded-bl-lg';
+                  if (boxIndex === 8) boxCornerClass = 'rounded-br-lg';
 
-                    return (
-                      <div key={boxIndex} className={`grid grid-cols-3 grid-rows-3 gap-px ${thinInnerBorderColor} ${boxCornerClass}`}>
-                        {Array.from({ length: 9 }).map((_, cellInBoxIndex) => {
-                          const cellRow = Math.floor(cellInBoxIndex / 3);
-                          const cellCol = cellInBoxIndex % 3;
-                          const rowIndex = boxRowStart + cellRow;
-                          const colIndex = boxColStart + cellCol;
-                          const cellData = board[rowIndex][colIndex];
-                          const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
-                          const isPeer = selectedCell ? 
-                            (selectedCell.row === rowIndex || selectedCell.col === colIndex || 
-                            (Math.floor(selectedCell.row / 3) === Math.floor(rowIndex / 3) && Math.floor(selectedCell.col / 3) === Math.floor(colIndex / 3)))
-                            : false;
-                          const isCorrect = !cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex];
-                          
-                          let isHighlighted = false;
-                          if (highlightedNumber !== null && !isSelected) {
-                            const isHighlightedByValue = cellData.value === highlightedNumber;
-                            const isHighlightedByNote =
-                              isHighlightNotesEnabled &&
-                              cellData.value === 0 &&
-                              (cellData.userNotes.has(highlightedNumber) || cellData.autoNotes.has(highlightedNumber));
-                            isHighlighted = isHighlightedByValue || isHighlightedByNote;
-                          }
+                  return (
+                    <div key={boxIndex} className={`grid grid-cols-3 grid-rows-3 gap-0.5 ${thinInnerBorderColor} ${boxCornerClass}`}>
+                      {Array.from({ length: 9 }).map((_, cellInBoxIndex) => {
+                        const cellRow = Math.floor(cellInBoxIndex / 3);
+                        const cellCol = cellInBoxIndex % 3;
+                        const rowIndex = boxRowStart + cellRow;
+                        const colIndex = boxColStart + cellCol;
+                        const cellData = board[rowIndex][colIndex];
+                        const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                        const isPeer = selectedCell ? 
+                          (selectedCell.row === rowIndex || selectedCell.col === colIndex || 
+                          (Math.floor(selectedCell.row / 3) === Math.floor(rowIndex / 3) && Math.floor(selectedCell.col / 3) === Math.floor(colIndex / 3)))
+                          : false;
+                        const isCorrect = !cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex];
+                        
+                        let isHighlighted = false;
+                        if (highlightedNumber !== null && !isSelected) {
+                          const isHighlightedByValue = cellData.value === highlightedNumber;
+                          const isHighlightedByNote =
+                            isHighlightNotesEnabled &&
+                            cellData.value === 0 &&
+                            (cellData.userNotes.has(highlightedNumber) || cellData.autoNotes.has(highlightedNumber));
+                          isHighlighted = isHighlightedByValue || isHighlightedByNote;
+                        }
 
-                          const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
-                          
-                          let cellCornerClass = '';
-                          if (rowIndex === 0 && colIndex === 0) cellCornerClass = 'rounded-tl-sm';
-                          if (rowIndex === 0 && colIndex === 8) cellCornerClass = 'rounded-tr-sm';
-                          if (rowIndex === 8 && colIndex === 0) cellCornerClass = 'rounded-bl-sm';
-                          if (rowIndex === 8 && colIndex === 8) cellCornerClass = 'rounded-br-sm';
+                        const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
+                        
+                        let cellCornerClass = '';
+                        if (rowIndex === 0 && colIndex === 0) cellCornerClass = 'rounded-tl-sm';
+                        if (rowIndex === 0 && colIndex === 8) cellCornerClass = 'rounded-tr-sm';
+                        if (rowIndex === 8 && colIndex === 0) cellCornerClass = 'rounded-bl-sm';
+                        if (rowIndex === 8 && colIndex === 8) cellCornerClass = 'rounded-br-sm';
 
-                          return (
-                            <Cell 
-                              key={`${rowIndex}-${colIndex}`}
-                              data={cellData}
-                              isSelected={isSelected}
-                              isPeer={isPeer && !isSelected}
-                              isHighlighted={isHighlighted}
-                              isCorrect={isCorrect}
-                              onClick={() => onCellClick(rowIndex, colIndex)}
-                              isDarkMode={isDark}
-                              isNotesMode={isNotesMode}
-                              className={cellCornerClass}
-                              isAutoNotesEnabled={isAutoNotesEnabled}
-                              highlightedNumber={highlightedNumber}
-                              isHintTarget={isHintTarget}
-                            />
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
+                        return (
+                          <Cell 
+                            key={`${rowIndex}-${colIndex}`}
+                            data={cellData}
+                            isSelected={isSelected}
+                            isPeer={isPeer && !isSelected}
+                            isHighlighted={isHighlighted}
+                            isCorrect={isCorrect}
+                            onClick={() => onCellClick(rowIndex, colIndex)}
+                            isDarkMode={isDark}
+                            isNotesMode={isNotesMode}
+                            className={cellCornerClass}
+                            isAutoNotesEnabled={isAutoNotesEnabled}
+                            highlightedNumber={highlightedNumber}
+                            isHintTarget={isHintTarget}
+                            hintEffect={hintEffect}
+                            rowIndex={rowIndex}
+                            colIndex={colIndex}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -520,7 +541,7 @@
         `;
 
         return (
-          <div className={`rounded-full p-2 flex justify-center items-center gap-1 w-full transition-all duration-300 shadow-lg ${containerBgClass}`}>
+          <div className={`rounded-full p-1 flex justify-around items-center w-full transition-all duration-300 shadow-lg ${containerBgClass}`}>
             {Array.from({ length: 9 }).map((_, i) => {
               const num = i + 1;
               return (
@@ -528,9 +549,9 @@
                   key={num}
                   onClick={() => onNumberClick(num)}
                   className={`
-                    w-10 h-10 sm:w-12 sm:h-12 
+                    w-12 h-12 sm:w-16 sm:h-16 
                     flex items-center justify-center
-                    font-semibold text-3xl 
+                    font-bold text-3xl sm:text-4xl
                     rounded-full 
                     focus:outline-none 
                     ${baseButtonClasses}
@@ -1181,7 +1202,15 @@
         const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
         const [hintUsageCount, setHintUsageCount] = useState(0);
         const [hintCooldownDuration, setHintCooldownDuration] = useState(5);
+        const [hintEffect, setHintEffect] = useState(null);
         const cooldownIntervalRef = useRef(null);
+
+        useEffect(() => {
+          if (hintEffect) {
+              const timer = setTimeout(() => setHintEffect(null), 800);
+              return () => clearTimeout(timer);
+          }
+        }, [hintEffect]);
 
         useEffect(() => {
           return () => {
@@ -1489,6 +1518,7 @@
                   const incorrectNotes = Array.from(candidates).filter(n => n !== correctAnswer);
                   const shuffled = incorrectNotes.sort(() => 0.5 - Math.random());
                   const notesToEliminate = shuffled.slice(0, Math.max(1, Math.ceil(shuffled.length / 2)));
+                  setHintEffect({ type: 'note-pop', cell: { row, col }, notes: [...notesToEliminate] });
                   const newBoard = deepCopyBoard(board);
                   const cellToUpdate = newBoard[row][col];
                   notesToEliminate.forEach(num => {
@@ -1522,6 +1552,7 @@
               if (bestCell) {
                   clearAllHintEffects();
                   setHintTargetCell(bestCell);
+                  setHintEffect({ type: 'cell-glow', cell: bestCell });
                   hintActionTaken = true;
               }
             }
@@ -1651,6 +1682,7 @@
                     isHighlightNotesEnabled={isHighlightNotesEnabled}
                     highlightedNumber={highlightedNumber}
                     hintTargetCell={hintTargetCell}
+                    hintEffect={hintEffect}
                   />
                 </div>
                 <div className={`relative w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} onClick={(e) => e.stopPropagation()}>
@@ -1658,7 +1690,7 @@
                         <NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} />
                     </div>
                 </div>
-                <div className="relative w-full" style={{minHeight: '80px'}}>
+                <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
                     <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
                             <Controls 
