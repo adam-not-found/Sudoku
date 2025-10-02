@@ -801,7 +801,7 @@ const Controls = ({
 };
 
 // From components/Header.tsx
-const Header = ({ isDarkMode, onOpenSettings, onOpenStats, onNewGame }) => {
+const Header = ({ isDarkMode, onOpenSettings, onOpenStats, onNewGame, elapsedTime, isTimerVisible }) => {
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const menuRef = useRef(null);
   const textColor = isDarkMode ? 'text-slate-100' : 'text-gray-800';
@@ -830,17 +830,32 @@ const Header = ({ isDarkMode, onOpenSettings, onOpenStats, onNewGame }) => {
     setShowNewGameConfirm(false);
   };
 
+  const formatTime = (milliseconds) => {
+    if (typeof milliseconds !== 'number' || milliseconds < 0) return '0:00';
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   return (
     <header className="absolute top-2 left-0 right-0 w-full p-4 z-20">
       <div className="relative w-full flex items-center justify-between h-12">
         <div className="flex-1 flex justify-start">
-          <button
-            onClick={onOpenStats}
-            className={`w-12 h-12 ${baseButtonClasses} ${buttonColor}`}
-            aria-label="Open statistics"
-          >
-            <StatsIcon />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onOpenStats}
+              className={`w-12 h-12 ${baseButtonClasses} ${buttonColor}`}
+              aria-label="Open statistics"
+            >
+              <StatsIcon />
+            </button>
+            {isTimerVisible && (
+              <div className={`px-3 py-1.5 rounded-full text-lg font-semibold transition-colors ${isDarkMode ? 'bg-slate-700/80 text-slate-300' : 'bg-slate-200/80 text-slate-600'}`}>
+                  {formatTime(elapsedTime)}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex-1 flex justify-center">
             <div className="relative" ref={menuRef}>
@@ -969,6 +984,8 @@ const SettingsPanel = ({
   onSetAutoNotes,
   isHighlightNotesEnabled,
   onSetHighlightNotes,
+  isTimerVisible,
+  onSetIsTimerVisible
 }) => {
   const [selectedDifficulty, setSelectedDifficulty] = useState(currentDifficulty);
 
@@ -1061,6 +1078,26 @@ const SettingsPanel = ({
                 <span
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isHighlightNotesEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
+            </div>
+            <div className="flex justify-between items-center">
+              <label htmlFor="timer-toggle" className="font-medium pr-4">
+                Show Timer
+                <p className={`text-xs font-normal ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Display the game timer in the header.
+                </p>
+              </label>
+              <button
+                id="timer-toggle"
+                onClick={() => onSetIsTimerVisible(!isTimerVisible)}
+                role="switch"
+                aria-checked={isTimerVisible}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${isDarkMode ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'} ${isTimerVisible ? 'bg-sky-500' : (isDarkMode ? 'bg-slate-600' : 'bg-gray-200')}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isTimerVisible ? 'translate-x-5' : 'translate-x-0'}`}
                 />
               </button>
             </div>
@@ -1946,6 +1983,18 @@ const App = () => {
   const [hintEffect, setHintEffect] = useState(null);
   const [hintButtonEffect, setHintButtonEffect] = useState(null);
   const cooldownIntervalRef = useRef(null);
+  
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [movesCount, setMovesCount] = useState(0);
+  const [mistakesCount, setMistakesCount] = useState(0);
+  const [isTimerVisible, setIsTimerVisible] = useState(
+    () => localStorage.getItem('sudoku-timer-visible') === 'true'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('sudoku-timer-visible', String(isTimerVisible));
+  }, [isTimerVisible]);
 
   useEffect(() => {
     if (hintEffect) {
@@ -2000,19 +2049,51 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
   }, [isHighlightNotesEnabled]);
+  
+  const isUIBlocked = isSettingsOpen || isStatsOpen;
 
-  const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState(0);
-  const [movesCount, setMovesCount] = useState(0);
-  const [mistakesCount, setMistakesCount] = useState(0);
+  // This effect runs the timer
+  useEffect(() => {
+    let intervalId;
+    if (isTimerRunning) {
+      intervalId = setInterval(() => {
+        setElapsedTime(prevTime => prevTime + 1000);
+      }, 1000);
+    }
+    return () => clearInterval(intervalId);
+  }, [isTimerRunning]);
+
+  // This effect controls the timer's running state based on UI blocks and visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (isGameWon) return;
+      // This check is important to not resume timer if a modal is open when user returns to tab
+      if (!isUIBlocked) {
+        setIsTimerRunning(!document.hidden);
+      }
+    };
+
+    if (isUIBlocked || isGameWon) {
+      setIsTimerRunning(false);
+    } else {
+      setIsTimerRunning(!document.hidden);
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isUIBlocked, isGameWon]);
   
   const clearAllHintEffects = useCallback(() => {
     setActiveHint(null);
   }, []);
 
   const triggerWinState = useCallback(() => {
+    setIsTimerRunning(false); // Stop the timer
     const randomMessage = victoryMessages[Math.floor(Math.random() * victoryMessages.length)];
-    const gameDuration = Date.now() - startTime;
+    const gameDuration = elapsedTime;
     
     setStats(prev => {
         const difficultyStats = prev.byDifficulty[difficulty];
@@ -2037,11 +2118,10 @@ const App = () => {
 
     setVictoryMessage(randomMessage);
     setIsGameWon(true);
-    setEndTime(Date.now());
     setSelectedCell(null);
     clearAllHintEffects();
     localStorage.removeItem(SAVED_GAME_KEY);
-  }, [clearAllHintEffects, startTime, difficulty, movesCount, mistakesCount]);
+  }, [clearAllHintEffects, elapsedTime, difficulty, movesCount, mistakesCount]);
 
   const checkWinCondition = useCallback((currentBoard) => {
     if (solution.length === 0) return false;
@@ -2095,8 +2175,8 @@ const App = () => {
     }
     setHintUsageCount(0);
 
-    setStartTime(Date.now());
-    setEndTime(0);
+    setElapsedTime(0);
+    setIsTimerRunning(true);
     setMovesCount(0);
     setMistakesCount(0);
   }, [isAutoNotesEnabled, clearAllHintEffects]);
@@ -2111,7 +2191,7 @@ const App = () => {
         setSolution(savedGame.solution);
         setHistory(savedGame.history || []);
         setRedoHistory(savedGame.redoHistory || []);
-        setStartTime(savedGame.startTime);
+        setElapsedTime(savedGame.elapsedTime || 0);
         setMovesCount(savedGame.movesCount);
         setMistakesCount(savedGame.mistakesCount);
         setHintUsageCount(savedGame.hintUsageCount || 0);
@@ -2132,9 +2212,9 @@ const App = () => {
 
   useEffect(() => {
     if (board.length === 0 || isGameWon) return;
-    const gameState = { board, puzzle, solution, history, redoHistory, startTime, movesCount, mistakesCount, difficulty, hintUsageCount };
+    const gameState = { board, puzzle, solution, history, redoHistory, elapsedTime, movesCount, mistakesCount, difficulty, hintUsageCount };
     localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(gameState, serializeSets));
-  }, [board, puzzle, solution, history, redoHistory, startTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
+  }, [board, puzzle, solution, history, redoHistory, elapsedTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
   
   useEffect(() => {
     if (isGameWon) {
@@ -2359,17 +2439,15 @@ const App = () => {
   }
   
   const formatTime = (milliseconds) => {
-    if (!milliseconds || milliseconds <= 0) return '0:00';
+    if (!milliseconds || milliseconds < 0) return '0:00';
     const totalSeconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const elapsedTime = endTime > 0 ? endTime - startTime : 0;
   const highlightedNumber = selectedCell && board[selectedCell.row][selectedCell.col].value > 0
     ? board[selectedCell.row][selectedCell.col].value : null;
-  const isUIBlocked = isSettingsOpen || isStatsOpen;
 
   return (
     <div className={`min-h-screen font-sans relative`} onClick={() => setSelectedCell(null)}>
@@ -2378,6 +2456,8 @@ const App = () => {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenStats={() => setIsStatsOpen(true)}
           onNewGame={() => startNewGame(difficulty)}
+          elapsedTime={elapsedTime}
+          isTimerVisible={isTimerVisible}
         />
       <div className={`min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-32 pb-4 sm:pb-8 px-4`}>
         <main className={`w-full max-w-lg flex flex-col items-center gap-2 sm:gap-4 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
@@ -2454,6 +2534,8 @@ const App = () => {
         onFillBoard={handleFillBoardAndCloseSettings} isAutoNotesEnabled={isAutoNotesEnabled}
         onSetAutoNotes={handleSetAutoNotes} isHighlightNotesEnabled={isHighlightNotesEnabled}
         onSetHighlightNotes={setIsHighlightNotesEnabled}
+        isTimerVisible={isTimerVisible}
+        onSetIsTimerVisible={setIsTimerVisible}
       />
       <StatsPanel isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} stats={stats} isDarkMode={isDarkMode} />
     </div>
