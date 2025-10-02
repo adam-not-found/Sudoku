@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-// Fix: Corrected typo in import statement to properly import React hooks.
 import React, { useState, useEffect, useRef } from 'react';
 
 function usePrevious(value) {
@@ -14,7 +13,6 @@ function usePrevious(value) {
   return ref.current;
 }
 
-// Fix: Define a props interface for the Cell component.
 type CellProps = {
   data: {
     value: number;
@@ -33,15 +31,15 @@ type CellProps = {
   isNotesMode: boolean;
   isAutoNotesEnabled: boolean;
   highlightedNumber: number | null;
-  isHintTarget: boolean;
-  hintEffect: { type: string; cell: { row: number; col: number }; notes?: number[] } | null;
+  isHintPrimary: boolean;
+  isHintSecondary: boolean;
+  hintEffect: { type: string; cell?: { row: number; col: number }; eliminations?: {row: number, col: number, num: number}[] } | null;
   rowIndex: number;
   colIndex: number;
   className?: string;
 };
 
-// Fix: Explicitly type the component with React.FC<CellProps> to ensure TypeScript recognizes it as a React component that can accept special props like 'key'.
-export const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintTarget, hintEffect, rowIndex, colIndex, className = '' }) => {
+export const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintPrimary, isHintSecondary, hintEffect, rowIndex, colIndex, className = '' }) => {
   const { value, isInitial, isWrong, userNotes, autoNotes, eliminatedNotes } = data;
 
   const [isAnimating, setIsAnimating] = useState(false);
@@ -95,13 +93,15 @@ export const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighligh
     } else {
       if (isDarkMode) {
         hoverClass = isInitial ? 'hover:bg-slate-700/80' : 'hover:bg-sky-900/50';
-        if (isHintTarget) backgroundClass = 'bg-amber-500/50';
+        if (isHintPrimary) backgroundClass = 'bg-amber-400/60';
+        else if (isHintSecondary) backgroundClass = 'bg-amber-400/30';
         else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-800/60';
         else if (isPeer) backgroundClass = 'bg-slate-700';
         else backgroundClass = 'bg-slate-800';
       } else {
         hoverClass = isInitial ? 'hover:bg-slate-200/80' : 'hover:bg-sky-100';
-        if (isHintTarget) backgroundClass = 'bg-amber-300/80';
+        if (isHintPrimary) backgroundClass = 'bg-amber-300/80';
+        else if (isHintSecondary) backgroundClass = 'bg-amber-300/50';
         else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-100';
         else if (isPeer) backgroundClass = 'bg-slate-100';
         else backgroundClass = 'bg-white';
@@ -135,9 +135,7 @@ export const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighligh
             const isAutoNote = autoNotes.has(num);
             const isEliminationNote = eliminatedNotes.has(num);
             const isNewlyEliminated = hintEffect?.type === 'note-pop' &&
-                                    hintEffect.cell.row === rowIndex &&
-                                    hintEffect.cell.col === colIndex &&
-                                    hintEffect.notes.includes(num);
+                                    hintEffect.eliminations.some(e => e.row === rowIndex && e.col === colIndex && e.num === num);
 
             const isNoteVisible = isUserNote || isAutoNote || isEliminationNote;
             if (!isNoteVisible) return <div key={i} />;

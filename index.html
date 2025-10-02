@@ -172,6 +172,42 @@ const solveGrid = (grid) => {
   return true;
 };
 
+const countSolutions = (grid) => {
+  function findEmpty(g) {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (g[r][c] === 0) return [r, c];
+      }
+    }
+    return null;
+  }
+
+  function solve() {
+    const emptyPos = findEmpty(grid);
+    if (!emptyPos) {
+      return 1; // Solution found
+    }
+    
+    const [row, col] = emptyPos;
+    let count = 0;
+    
+    for (let num = 1; num <= 9; num++) {
+      if (isSafe(grid, row, col, num)) {
+        grid[row][col] = num;
+        count += solve();
+        if (count > 1) {
+          break; // Optimization: stop counting if we have more than one solution
+        }
+      }
+    }
+    
+    grid[row][col] = 0; // Backtrack
+    return count;
+  }
+  
+  return solve();
+};
+
 const DIFFICULTY_LEVELS = {
   easy: 40,
   medium: 48,
@@ -182,16 +218,41 @@ const DIFFICULTY_LEVELS = {
 const generateSudoku = (difficulty = 'medium') => {
   const solution = Array(9).fill(0).map(() => Array(9).fill(0));
   solveGrid(solution);
+  
   const puzzle = solution.map(row => [...row]);
-  let attempts = DIFFICULTY_LEVELS[difficulty] ?? 48;
-  while (attempts > 0) {
-    let row = Math.floor(Math.random() * 9);
-    let col = Math.floor(Math.random() * 9);
-    if (puzzle[row][col] !== 0) {
-      puzzle[row][col] = 0;
-      attempts--;
+  
+  // Create a list of all cell coordinates and shuffle them to randomize removal
+  const cells = [];
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      cells.push({ r, c });
     }
   }
+  shuffle(cells);
+
+  let removedCount = 0;
+  const cellsToRemove = DIFFICULTY_LEVELS[difficulty] ?? 48;
+
+  for (const cell of cells) {
+    if (removedCount >= cellsToRemove) {
+      break;
+    }
+    
+    const { r, c } = cell;
+    const backup = puzzle[r][c];
+    puzzle[r][c] = 0;
+    
+    const puzzleCopy = puzzle.map(row => [...row]);
+    const numSolutions = countSolutions(puzzleCopy);
+    
+    if (numSolutions !== 1) {
+      // This removal makes the puzzle invalid (0 or >1 solutions). Put the number back.
+      puzzle[r][c] = backup;
+    } else {
+      removedCount++;
+    }
+  }
+
   return { puzzle, solution };
 };
 
@@ -256,7 +317,7 @@ function usePrevious(value) {
   return ref.current;
 }
 
-const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintTarget, hintEffect, rowIndex, colIndex, className = '' }) => {
+const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isDarkMode, isNotesMode, isAutoNotesEnabled, highlightedNumber, isHintPrimary, isHintSecondary, hintEffect, rowIndex, colIndex, className = '' }) => {
   const { value, isInitial, isWrong, userNotes, autoNotes, eliminatedNotes } = data;
 
   const [isAnimating, setIsAnimating] = useState(false);
@@ -310,13 +371,15 @@ const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isD
     } else {
       if (isDarkMode) {
         hoverClass = isInitial ? 'hover:bg-slate-700/80' : 'hover:bg-sky-900/50';
-        if (isHintTarget) backgroundClass = 'bg-amber-500/50';
+        if (isHintPrimary) backgroundClass = 'bg-amber-400/60';
+        else if (isHintSecondary) backgroundClass = 'bg-amber-400/30';
         else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-800/60';
         else if (isPeer) backgroundClass = 'bg-slate-700';
         else backgroundClass = 'bg-slate-800';
       } else {
         hoverClass = isInitial ? 'hover:bg-slate-200/80' : 'hover:bg-sky-100';
-        if (isHintTarget) backgroundClass = 'bg-amber-300/80';
+        if (isHintPrimary) backgroundClass = 'bg-amber-300/80';
+        else if (isHintSecondary) backgroundClass = 'bg-amber-300/50';
         else if (isHighlighted && value !== 0) backgroundClass = 'bg-blue-100';
         else if (isPeer) backgroundClass = 'bg-slate-100';
         else backgroundClass = 'bg-white';
@@ -350,9 +413,7 @@ const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isD
             const isAutoNote = autoNotes.has(num);
             const isEliminationNote = eliminatedNotes.has(num);
             const isNewlyEliminated = hintEffect?.type === 'note-pop' &&
-                                    hintEffect.cell.row === rowIndex &&
-                                    hintEffect.cell.col === colIndex &&
-                                    hintEffect.notes.includes(num);
+                                    hintEffect.eliminations.some(e => e.row === rowIndex && e.col === colIndex && e.num === num);
 
             const isNoteVisible = isUserNote || isAutoNote || isEliminationNote;
             if (!isNoteVisible) return <div key={i} />;
@@ -413,7 +474,7 @@ const Cell = ({ data, isSelected, isPeer, isHighlighted, isCorrect, onClick, isD
 };
 
 // From components/SudokuBoard.tsx
-const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell, hintEffect }) => {
+const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, activeHint, hintEffect }) => {
   const isDark = isDarkMode || forceDarkMode;
   const outerBorderBgColor = isDark ? 'bg-slate-600' : 'bg-slate-300';
   const thickInnerBorderColor = isDark ? 'bg-slate-500' : 'bg-slate-400';
@@ -458,7 +519,8 @@ const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, 
                   isHighlighted = isHighlightedByValue || isHighlightedByNote;
                 }
 
-                const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
+                const isHintPrimary = !!activeHint?.primaryCells.some(c => c.row === rowIndex && c.col === colIndex);
+                const isHintSecondary = !!activeHint?.secondaryCells.some(c => c.row === rowIndex && c.col === colIndex);
                 
                 let cellCornerClass = '';
                 if (rowIndex === 0 && colIndex === 0) cellCornerClass = 'rounded-tl-sm';
@@ -480,7 +542,8 @@ const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, 
                     className={cellCornerClass}
                     isAutoNotesEnabled={isAutoNotesEnabled}
                     highlightedNumber={highlightedNumber}
-                    isHintTarget={isHintTarget}
+                    isHintPrimary={isHintPrimary}
+                    isHintSecondary={isHintSecondary}
                     hintEffect={hintEffect}
                     rowIndex={rowIndex}
                     colIndex={colIndex}
@@ -545,15 +608,16 @@ const Controls = ({
   isHintOnCooldown,
   cooldownDuration,
   onDelete,
-  isDarkMode
+  isDarkMode,
+  hintButtonEffect
 }) => {
-  const [animation, setAnimation] = useState(null);
+  const [popAnimation, setPopAnimation] = useState(false);
   const prevCooldown = useRef(isHintOnCooldown);
   const animationKey = useRef(0);
 
   useEffect(() => {
     if (prevCooldown.current && !isHintOnCooldown) {
-      setAnimation('refill');
+      setPopAnimation(true);
     }
     prevCooldown.current = isHintOnCooldown;
   }, [isHintOnCooldown]);
@@ -561,7 +625,6 @@ const Controls = ({
   const handleHintClick = () => {
     if (isHintOnCooldown) return;
     animationKey.current += 1;
-    setAnimation('pop');
     onHint();
   };
 
@@ -573,8 +636,9 @@ const Controls = ({
     ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' 
     : iconButtonClasses;
   const hintHoverClass = isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
-  const animationClass = animation === 'pop' ? 'animate-hint-pop' : animation === 'refill' ? 'animate-hint-refill' : '';
-
+  const hintButtonAnimationClass = hintButtonEffect === 'shake' ? 'animate-shake' : '';
+  const popAnimationClass = popAnimation ? 'animate-hint-refill' : '';
+  
   return (
     <div className={`rounded-full p-2 flex justify-center items-center gap-2 shadow-lg transition-colors duration-300 ${containerClasses}`}>
       <button 
@@ -602,8 +666,8 @@ const Controls = ({
       <button 
         onClick={handleHintClick}
         disabled={isHintOnCooldown}
-        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${animationClass}`}
-        onAnimationEnd={() => setAnimation(null)}
+        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${hintButtonAnimationClass} ${popAnimationClass}`}
+        onAnimationEnd={() => setPopAnimation(false)}
         aria-label={isHintOnCooldown ? "Hint is on cooldown" : "Get a hint"}
       >
         <div className="relative w-full h-full flex items-center justify-center">
@@ -1049,6 +1113,638 @@ const StatsPanel = ({ isOpen, onClose, stats, isDarkMode }) => {
   );
 };
 
+const calculateCandidates = (currentBoard, row, col) => {
+    const candidates = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const gridValues = currentBoard.map(r => r.map(c => c.value));
+    for (let i = 0; i < 9; i++) {
+        if (gridValues[row][i] !== 0) candidates.delete(gridValues[row][i]);
+        if (gridValues[i][col] !== 0) candidates.delete(gridValues[i][col]);
+    }
+    const boxStartRow = Math.floor(row / 3) * 3;
+    const boxStartCol = Math.floor(col / 3) * 3;
+    for (let i = boxStartRow; i < boxStartRow + 3; i++) {
+        for (let j = boxStartCol; j < boxStartCol + 3; j++) {
+            if (gridValues[i][j] !== 0) candidates.delete(gridValues[i][j]);
+        }
+    }
+    return candidates;
+};
+
+// --- HINT LOGIC SERVICE ---
+const getNotes = (board, row, col) => {
+    const cell = board[row][col];
+    if (cell.value !== 0) return new Set();
+    const candidates = calculateCandidates(board, row, col);
+    cell.eliminatedNotes.forEach(eliminated => candidates.delete(eliminated));
+    return candidates;
+};
+
+const getUnitCells = (type, index) => {
+    const cells = [];
+    if (type === 'row') {
+        for (let c = 0; c < 9; c++) cells.push({ row: index, col: c });
+    } else if (type === 'col') {
+        for (let r = 0; r < 9; r++) cells.push({ row: r, col: index });
+    } else if (type === 'box') {
+        const boxStartRow = Math.floor(index / 3) * 3;
+        const boxStartCol = (index % 3) * 3;
+        for (let r = boxStartRow; r < boxStartRow + 3; r++) {
+            for (let c = boxStartCol; c < boxStartCol + 3; c++) {
+                cells.push({ row: r, col: c });
+            }
+        }
+    }
+    return cells;
+};
+
+const findNakedSingle = (board, targetCell) => {
+    const checkCell = (r, c) => {
+        if (board[r][c].value === 0) {
+            const notes = getNotes(board, r, c);
+            if (notes.size === 1) {
+                const num = notes.values().next().value;
+                return {
+                    type: 'Naked Single',
+                    primaryCells: [{ row: r, col: c }],
+                    secondaryCells: [],
+                    eliminations: [],
+                    solve: { row: r, col: c, num },
+                };
+            }
+        }
+        return null;
+    }
+    if (targetCell) return checkCell(targetCell.row, targetCell.col);
+
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            const hint = checkCell(r, c);
+            if (hint) return hint;
+        }
+    }
+    return null;
+};
+
+const findHiddenSingle = (board, targetCell) => {
+    const unitConfigs = [];
+    if (targetCell) {
+        const boxIndex = Math.floor(targetCell.row / 3) * 3 + Math.floor(targetCell.col / 3);
+        unitConfigs.push({ type: 'row', index: targetCell.row, cells: getUnitCells('row', targetCell.row) });
+        unitConfigs.push({ type: 'col', index: targetCell.col, cells: getUnitCells('col', targetCell.col) });
+        unitConfigs.push({ type: 'box', index: boxIndex, cells: getUnitCells('box', boxIndex) });
+    } else {
+        for(let i=0; i<9; i++) {
+            unitConfigs.push({ type: 'row', index: i, cells: getUnitCells('row', i) });
+            unitConfigs.push({ type: 'col', index: i, cells: getUnitCells('col', i) });
+            unitConfigs.push({ type: 'box', index: i, cells: getUnitCells('box', i) });
+        }
+    }
+
+    for (const unit of unitConfigs) {
+        const candidateMap = new Map();
+        for (let num = 1; num <= 9; num++) { candidateMap.set(num, []); }
+
+        for (const cell of unit.cells) {
+            if (board[cell.row][cell.col].value === 0) {
+                const notes = getNotes(board, cell.row, cell.col);
+                notes.forEach(num => {
+                    candidateMap.get(num).push(cell);
+                });
+            }
+        }
+
+        for (let num = 1; num <= 9; num++) {
+            const possibleCells = candidateMap.get(num);
+            if (possibleCells.length === 1) {
+                const target = possibleCells[0];
+                if (targetCell && (target.row !== targetCell.row || target.col !== targetCell.col)) {
+                    continue;
+                }
+                const secondaryCells = unit.cells.filter(c => !(c.row === target.row && c.col === target.col));
+                return {
+                    type: 'Hidden Single',
+                    primaryCells: [target],
+                    secondaryCells: secondaryCells,
+                    eliminations: [],
+                    solve: { row: target.row, col: target.col, num },
+                };
+            }
+        }
+    }
+    return null;
+};
+
+const findNakedPair = (board, targetCell) => {
+    const units = [];
+    if (targetCell) {
+        const boxIndex = Math.floor(targetCell.row / 3) * 3 + Math.floor(targetCell.col / 3);
+        units.push(getUnitCells('row', targetCell.row));
+        units.push(getUnitCells('col', targetCell.col));
+        units.push(getUnitCells('box', boxIndex));
+    } else {
+        for(let i=0; i<9; i++) {
+            units.push(getUnitCells('row', i));
+            units.push(getUnitCells('col', i));
+            units.push(getUnitCells('box', i));
+        }
+    }
+
+    for (const unit of units) {
+        const cellsWithTwoNotes = unit.filter(cell => getNotes(board, cell.row, cell.col).size === 2);
+        if (cellsWithTwoNotes.length < 2) continue;
+
+        for (let i = 0; i < cellsWithTwoNotes.length; i++) {
+            for (let j = i + 1; j < cellsWithTwoNotes.length; j++) {
+                const cell1 = cellsWithTwoNotes[i];
+                const cell2 = cellsWithTwoNotes[j];
+                const notes1 = getNotes(board, cell1.row, cell1.col);
+                const notes2 = getNotes(board, cell2.row, cell2.col);
+                const notes1Arr = [...notes1].sort();
+                const notes2Arr = [...notes2].sort();
+
+                if (notes1Arr.length === 2 && notes1Arr[0] === notes2Arr[0] && notes1Arr[1] === notes2Arr[1]) {
+                    const pairNums = notes1Arr;
+                    const primaryCells = [cell1, cell2];
+                    const eliminations = [];
+                    const secondaryCells = [];
+
+                    for (const unitCell of unit) {
+                        if (primaryCells.some(pc => pc.row === unitCell.row && pc.col === unitCell.col)) continue;
+                        
+                        const unitCellNotes = getNotes(board, unitCell.row, unitCell.col);
+                        let madeElimination = false;
+                        if (unitCellNotes.has(pairNums[0])) {
+                            eliminations.push({ row: unitCell.row, col: unitCell.col, num: pairNums[0] });
+                            madeElimination = true;
+                        }
+                        if (unitCellNotes.has(pairNums[1])) {
+                            eliminations.push({ row: unitCell.row, col: unitCell.col, num: pairNums[1] });
+                            madeElimination = true;
+                        }
+                        if (madeElimination && !secondaryCells.some(sc => sc.row === unitCell.row && sc.col === unitCell.col)) {
+                            secondaryCells.push(unitCell);
+                        }
+                    }
+
+                    if (eliminations.length > 0) {
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        
+                        return {
+                            type: 'Naked Pair',
+                            primaryCells,
+                            secondaryCells,
+                            eliminations,
+                            solve: null,
+                        };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findHiddenPair = (board, targetCell) => {
+    const units = [];
+    if (targetCell) {
+        const boxIndex = Math.floor(targetCell.row / 3) * 3 + Math.floor(targetCell.col / 3);
+        units.push(getUnitCells('row', targetCell.row));
+        units.push(getUnitCells('col', targetCell.col));
+        units.push(getUnitCells('box', boxIndex));
+    } else {
+        for(let i=0; i<9; i++) {
+            units.push(getUnitCells('row', i));
+            units.push(getUnitCells('col', i));
+            units.push(getUnitCells('box', i));
+        }
+    }
+    
+    for (const unit of units) {
+        const candidateMap = new Map();
+        for (let num = 1; num <= 9; num++) { candidateMap.set(num, []); }
+
+        for (const cell of unit) {
+            if (board[cell.row][cell.col].value === 0) {
+                getNotes(board, cell.row, cell.col).forEach(num => {
+                    candidateMap.get(num).push(cell);
+                });
+            }
+        }
+
+        const numsInTwoCells = [];
+        for (let num = 1; num <= 9; num++) {
+            if (candidateMap.get(num).length === 2) {
+                numsInTwoCells.push(num);
+            }
+        }
+
+        if (numsInTwoCells.length < 2) continue;
+
+        for (let i = 0; i < numsInTwoCells.length; i++) {
+            for (let j = i + 1; j < numsInTwoCells.length; j++) {
+                const num1 = numsInTwoCells[i];
+                const num2 = numsInTwoCells[j];
+                const cells1 = candidateMap.get(num1);
+                const cells2 = candidateMap.get(num2);
+
+                const cells1Ids = cells1.map(c => `${c.row}-${c.col}`).sort();
+                const cells2Ids = cells2.map(c => `${c.row}-${c.col}`).sort();
+
+                if (cells1Ids[0] === cells2Ids[0] && cells1Ids[1] === cells2Ids[1]) {
+                    const primaryCells = cells1;
+                    if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+
+                    const allNotesInPair = new Set([...getNotes(board, primaryCells[0].row, primaryCells[0].col), ...getNotes(board, primaryCells[1].row, primaryCells[1].col)]);
+                    allNotesInPair.delete(num1);
+                    allNotesInPair.delete(num2);
+
+                    const eliminations = [];
+                    allNotesInPair.forEach(note => {
+                        eliminations.push({ row: primaryCells[0].row, col: primaryCells[0].col, num: note });
+                        eliminations.push({ row: primaryCells[1].row, col: primaryCells[1].col, num: note });
+                    });
+                    
+                    const uniqueElims = eliminations.filter((v,i,a)=>a.findIndex(t=>(t.row === v.row && t.col===v.col && t.num === v.num))===i);
+
+                    if (uniqueElims.length > 0) {
+                        return {
+                            type: 'Hidden Pair',
+                            primaryCells,
+                            secondaryCells: [],
+                            eliminations: uniqueElims,
+                            solve: null,
+                        };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findNakedTriple = (board, targetCell) => {
+    const units = [];
+    if (targetCell) {
+        const boxIndex = Math.floor(targetCell.row / 3) * 3 + Math.floor(targetCell.col / 3);
+        units.push(getUnitCells('row', targetCell.row));
+        units.push(getUnitCells('col', targetCell.col));
+        units.push(getUnitCells('box', boxIndex));
+    } else {
+        for(let i=0; i<9; i++) {
+            units.push(getUnitCells('row', i));
+            units.push(getUnitCells('col', i));
+            units.push(getUnitCells('box', i));
+        }
+    }
+
+    for (const unit of units) {
+        const candidateCells = unit.filter(cell => {
+            const notes = getNotes(board, cell.row, cell.col);
+            return notes.size > 1 && notes.size <= 3;
+        });
+
+        if (candidateCells.length < 3) continue;
+
+        for (let i = 0; i < candidateCells.length; i++) {
+            for (let j = i + 1; j < candidateCells.length; j++) {
+                for (let k = j + 1; k < candidateCells.length; k++) {
+                    const c1 = candidateCells[i], c2 = candidateCells[j], c3 = candidateCells[k];
+                    const n1 = getNotes(board, c1.row, c1.col), n2 = getNotes(board, c2.row, c2.col), n3 = getNotes(board, c3.row, c3.col);
+                    const combinedNotes = new Set([...n1, ...n2, ...n3]);
+
+                    if (combinedNotes.size === 3) {
+                        const primaryCells = [c1, c2, c3];
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+
+                        const tripleNums = [...combinedNotes];
+                        const eliminations = [], secondaryCells = [];
+
+                        for (const unitCell of unit) {
+                            if (primaryCells.some(pc => pc.row === unitCell.row && pc.col === unitCell.col)) continue;
+                            
+                            const unitCellNotes = getNotes(board, unitCell.row, unitCell.col);
+                            let madeElimination = false;
+                            for (const num of tripleNums) {
+                                if (unitCellNotes.has(num)) {
+                                    eliminations.push({ row: unitCell.row, col: unitCell.col, num });
+                                    madeElimination = true;
+                                }
+                            }
+                            if (madeElimination) secondaryCells.push(unitCell);
+                        }
+
+                        if (eliminations.length > 0) {
+                            const uniqueSecondary = secondaryCells.filter((v,i,a)=>a.findIndex(t=>(t.row === v.row && t.col===v.col))===i);
+                            return {
+                                type: 'Naked Triple',
+                                primaryCells,
+                                secondaryCells: uniqueSecondary,
+                                eliminations,
+                                solve: null,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findHiddenTriple = (board, targetCell) => {
+    const units = [];
+    if (targetCell) {
+        const boxIndex = Math.floor(targetCell.row / 3) * 3 + Math.floor(targetCell.col / 3);
+        units.push(getUnitCells('row', targetCell.row));
+        units.push(getUnitCells('col', targetCell.col));
+        units.push(getUnitCells('box', boxIndex));
+    } else {
+        for(let i=0; i<9; i++) {
+            units.push(getUnitCells('row', i));
+            units.push(getUnitCells('col', i));
+            units.push(getUnitCells('box', i));
+        }
+    }
+    
+    for (const unit of units) {
+        const candidateMap = new Map();
+        for (let num = 1; num <= 9; num++) { candidateMap.set(num, []); }
+
+        for (const cell of unit) {
+            if (board[cell.row][cell.col].value === 0) {
+                getNotes(board, cell.row, cell.col).forEach(num => {
+                    candidateMap.get(num).push(cell);
+                });
+            }
+        }
+
+        const candidateNums = [];
+        for (let num = 1; num <= 9; num++) {
+            const cells = candidateMap.get(num);
+            if (cells.length === 2 || cells.length === 3) candidateNums.push(num);
+        }
+        if (candidateNums.length < 3) continue;
+
+        for (let i = 0; i < candidateNums.length; i++) {
+            for (let j = i + 1; j < candidateNums.length; j++) {
+                for (let k = j + 1; k < candidateNums.length; k++) {
+                    const num1 = candidateNums[i], num2 = candidateNums[j], num3 = candidateNums[k];
+                    const cells1 = candidateMap.get(num1), cells2 = candidateMap.get(num2), cells3 = candidateMap.get(num3);
+                    const combinedCells = [...cells1, ...cells2, ...cells3];
+                    const uniqueCellIds = new Set(combinedCells.map(c => `${c.row}-${c.col}`));
+                    
+                    if (uniqueCellIds.size === 3) {
+                        const primaryCells = [...uniqueCellIds].map(id => ({ row: parseInt(id.split('-')[0]), col: parseInt(id.split('-')[1]) }));
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        
+                        const tripleNums = new Set([num1, num2, num3]);
+                        const eliminations = [];
+
+                        for (const cell of primaryCells) {
+                            getNotes(board, cell.row, cell.col).forEach(note => {
+                                if (!tripleNums.has(note)) {
+                                    eliminations.push({ row: cell.row, col: cell.col, num: note });
+                                }
+                            });
+                        }
+
+                        if (eliminations.length > 0) {
+                            return {
+                                type: 'Hidden Triple',
+                                primaryCells,
+                                secondaryCells: [],
+                                eliminations,
+                                solve: null,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findIntersectionRemoval = (board, targetCell) => {
+    // Pointing
+    for (let boxIndex = 0; boxIndex < 9; boxIndex++) {
+        const boxCells = getUnitCells('box', boxIndex);
+        for (let num = 1; num <= 9; num++) {
+            const candidateCells = boxCells.filter(cell => getNotes(board, cell.row, cell.col).has(num));
+            if (candidateCells.length < 2) continue;
+
+            const rows = new Set(candidateCells.map(c => c.row));
+            const cols = new Set(candidateCells.map(c => c.col));
+
+            if (rows.size === 1) { // All candidates for num in this box are in the same row
+                const row = rows.values().next().value;
+                const rowCells = getUnitCells('row', row);
+                const eliminations = [];
+                for (const cell of rowCells) {
+                    const inBox = Math.floor(cell.row / 3) * 3 + Math.floor(cell.col / 3) === boxIndex;
+                    if (!inBox && getNotes(board, cell.row, cell.col).has(num)) {
+                        eliminations.push({ row: cell.row, col: cell.col, num });
+                    }
+                }
+                if (eliminations.length > 0) {
+                    if (targetCell && !candidateCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                    const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
+                    return { type: 'Pointing', primaryCells: candidateCells, secondaryCells, eliminations, solve: null };
+                }
+            }
+            if (cols.size === 1) { // All candidates for num in this box are in the same col
+                const col = cols.values().next().value;
+                const colCells = getUnitCells('col', col);
+                const eliminations = [];
+                for (const cell of colCells) {
+                    const inBox = Math.floor(cell.row / 3) * 3 + Math.floor(cell.col / 3) === boxIndex;
+                    if (!inBox && getNotes(board, cell.row, cell.col).has(num)) {
+                        eliminations.push({ row: cell.row, col: cell.col, num });
+                    }
+                }
+                if (eliminations.length > 0) {
+                    if (targetCell && !candidateCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                    const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
+                    return { type: 'Pointing', primaryCells: candidateCells, secondaryCells, eliminations, solve: null };
+                }
+            }
+        }
+    }
+
+    // Claiming
+    for (let num = 1; num <= 9; num++) {
+        for (let i = 0; i < 9; i++) {
+            // Row Claiming
+            const rowCells = getUnitCells('row', i);
+            const rowCandidates = rowCells.filter(cell => getNotes(board, cell.row, cell.col).has(num));
+            if (rowCandidates.length > 1) {
+                const boxes = new Set(rowCandidates.map(c => Math.floor(c.row/3)*3 + Math.floor(c.col/3)));
+                if (boxes.size === 1) {
+                    const boxIndex = boxes.values().next().value;
+                    const boxCells = getUnitCells('box', boxIndex);
+                    const eliminations = [];
+                    for(const cell of boxCells) {
+                        if (cell.row !== i && getNotes(board, cell.row, cell.col).has(num)) {
+                            eliminations.push({ row: cell.row, col: cell.col, num });
+                        }
+                    }
+                    if (eliminations.length > 0) {
+                         if (targetCell && !rowCandidates.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                         const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
+                         return { type: 'Claiming', primaryCells: rowCandidates, secondaryCells, eliminations, solve: null };
+                    }
+                }
+            }
+
+            // Col Claiming
+            const colCells = getUnitCells('col', i);
+            const colCandidates = colCells.filter(cell => getNotes(board, cell.row, cell.col).has(num));
+            if (colCandidates.length > 1) {
+                const boxes = new Set(colCandidates.map(c => Math.floor(c.row/3)*3 + Math.floor(c.col/3)));
+                if (boxes.size === 1) {
+                    const boxIndex = boxes.values().next().value;
+                    const boxCells = getUnitCells('box', boxIndex);
+                    const eliminations = [];
+                     for(const cell of boxCells) {
+                        if (cell.col !== i && getNotes(board, cell.row, cell.col).has(num)) {
+                            eliminations.push({ row: cell.row, col: cell.col, num });
+                        }
+                    }
+                    if (eliminations.length > 0) {
+                        if (targetCell && !colCandidates.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
+                        return { type: 'Claiming', primaryCells: colCandidates, secondaryCells, eliminations, solve: null };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findXWing = (board, targetCell) => {
+    for (let num = 1; num <= 9; num++) {
+        // Row-based X-Wing
+        const rowCandidates = [];
+        for (let r = 0; r < 9; r++) {
+            const cols = [];
+            for (let c = 0; c < 9; c++) { if (getNotes(board, r, c).has(num)) { cols.push(c); } }
+            if (cols.length === 2) { rowCandidates.push({ row: r, cols: cols }); }
+        }
+
+        if (rowCandidates.length >= 2) {
+            for (let i = 0; i < rowCandidates.length; i++) {
+                for (let j = i + 1; j < rowCandidates.length; j++) {
+                    const r1 = rowCandidates[i], r2 = rowCandidates[j];
+                    if (r1.cols[0] === r2.cols[0] && r1.cols[1] === r2.cols[1]) {
+                        const c1 = r1.cols[0], c2 = r1.cols[1];
+                        const primaryCells = [ { row: r1.row, col: c1 }, { row: r1.row, col: c2 }, { row: r2.row, col: c1 }, { row: r2.row, col: c2 }];
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        const eliminations = [];
+                        for (let r = 0; r < 9; r++) {
+                            if (r !== r1.row && r !== r2.row) {
+                                if (getNotes(board, r, c1).has(num)) eliminations.push({ row: r, col: c1, num });
+                                if (getNotes(board, r, c2).has(num)) eliminations.push({ row: r, col: c2, num });
+                            }
+                        }
+                        if (eliminations.length > 0) {
+                            const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
+                            return { type: 'X-Wing', primaryCells, secondaryCells, eliminations, solve: null };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findSwordfish = (board, targetCell) => {
+    for (let num = 1; num <= 9; num++) {
+        // Row-based Swordfish
+        const rowCandidates = [];
+        for (let r = 0; r < 9; r++) {
+            const cols = [];
+            for (let c = 0; c < 9; c++) { if (getNotes(board, r, c).has(num)) { cols.push(c); } }
+            if (cols.length === 2 || cols.length === 3) { rowCandidates.push({ row: r, cols }); }
+        }
+
+        if (rowCandidates.length >= 3) {
+            for (let i = 0; i < rowCandidates.length; i++) {
+                for (let j = i + 1; j < rowCandidates.length; j++) {
+                    for (let k = j + 1; k < rowCandidates.length; k++) {
+                        const r1 = rowCandidates[i], r2 = rowCandidates[j], r3 = rowCandidates[k];
+                        const combinedCols = new Set([...r1.cols, ...r2.cols, ...r3.cols]);
+                        if (combinedCols.size === 3) {
+                            const [c1, c2, c3] = [...combinedCols].sort();
+                            const primaryRows = [r1.row, r2.row, r3.row];
+                            const primaryCells = [];
+                            primaryRows.forEach(r => {
+                                [c1, c2, c3].forEach(c => {
+                                    if(getNotes(board, r, c).has(num)) primaryCells.push({row: r, col: c});
+                                });
+                            });
+                            
+                            if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+
+                            const eliminations = [];
+                            for (let r = 0; r < 9; r++) {
+                                if (!primaryRows.includes(r)) {
+                                    if (getNotes(board, r, c1).has(num)) eliminations.push({ row: r, col: c1, num });
+                                    if (getNotes(board, r, c2).has(num)) eliminations.push({ row: r, col: c2, num });
+                                    if (getNotes(board, r, c3).has(num)) eliminations.push({ row: r, col: c3, num });
+                                }
+                            }
+                            if (eliminations.length > 0) {
+                                const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
+                                return { type: 'Swordfish', primaryCells, secondaryCells, eliminations, solve: null };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+
+const findHint = (board, difficulty, targetCell) => {
+    let hint = findNakedSingle(board, targetCell);
+    if (hint) return hint;
+    
+    hint = findHiddenSingle(board, targetCell);
+    if (hint) return hint;
+    
+    if (difficulty === 'hard' || difficulty === 'professional') {
+        hint = findNakedPair(board, targetCell);
+        if (hint) return hint;
+
+        hint = findHiddenPair(board, targetCell);
+        if (hint) return hint;
+
+        hint = findNakedTriple(board, targetCell);
+        if(hint) return hint;
+
+        hint = findHiddenTriple(board, targetCell);
+        if(hint) return hint;
+    }
+    
+    if (difficulty === 'professional') {
+        hint = findIntersectionRemoval(board, targetCell);
+        if (hint) return hint;
+
+        hint = findXWing(board, targetCell);
+        if (hint) return hint;
+
+        hint = findSwordfish(board, targetCell);
+        if (hint) return hint;
+    }
+
+    return null;
+};
+// --- END HINT LOGIC SERVICE ---
+
 
 // From App.tsx
 const { useCallback } = React;
@@ -1133,12 +1829,12 @@ const App = () => {
       return initialStats;
     }
   });
-  const [hintTargetCell, setHintTargetCell] = useState(null);
   const [activeHint, setActiveHint] = useState(null);
   const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
   const [hintUsageCount, setHintUsageCount] = useState(0);
-  const [hintCooldownDuration, setHintCooldownDuration] = useState(5);
+  const [hintCooldownDuration, setHintCooldownDuration] = useState(4);
   const [hintEffect, setHintEffect] = useState(null);
+  const [hintButtonEffect, setHintButtonEffect] = useState(null);
   const cooldownIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -1147,6 +1843,13 @@ const App = () => {
         return () => clearTimeout(timer);
     }
   }, [hintEffect]);
+  
+  useEffect(() => {
+    if (hintButtonEffect) {
+        const timer = setTimeout(() => setHintButtonEffect(null), 250);
+        return () => clearTimeout(timer);
+    }
+  }, [hintButtonEffect]);
 
   useEffect(() => {
     return () => {
@@ -1158,8 +1861,7 @@ const App = () => {
 
   const startCooldown = useCallback(() => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
-    const durations = [5, 10, 20, 30, 60];
-    const currentDuration = durations[Math.min(hintUsageCount, durations.length - 1)];
+    const currentDuration = 4; // Fixed 4 seconds for testing
     setHintCooldownDuration(currentDuration);
     setIsHintOnCooldown(true);
     let timer = currentDuration;
@@ -1170,7 +1872,7 @@ const App = () => {
         setIsHintOnCooldown(false);
       }
     }, 1000);
-  }, [hintUsageCount]);
+  }, []);
 
   useEffect(() => {
     document.body.classList.toggle('dark', isDarkMode);
@@ -1194,12 +1896,9 @@ const App = () => {
   const [movesCount, setMovesCount] = useState(0);
   const [mistakesCount, setMistakesCount] = useState(0);
   
-  const clearProgressiveHint = useCallback(() => setActiveHint(null), []);
-  const clearHintHighlights = useCallback(() => setHintTargetCell(null), []);
   const clearAllHintEffects = useCallback(() => {
-    clearHintHighlights();
-    clearProgressiveHint();
-  }, [clearHintHighlights, clearProgressiveHint]);
+    setActiveHint(null);
+  }, []);
 
   const triggerWinState = useCallback(() => {
     const randomMessage = victoryMessages[Math.floor(Math.random() * victoryMessages.length)];
@@ -1246,23 +1945,6 @@ const App = () => {
     return true;
   }, [solution]);
   
-  const getCandidates = (currentBoard, row, col) => {
-      const candidates = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-      const gridValues = currentBoard.map(r => r.map(c => c.value));
-      for (let i = 0; i < 9; i++) {
-          if (gridValues[row][i] !== 0) candidates.delete(gridValues[row][i]);
-          if (gridValues[i][col] !== 0) candidates.delete(gridValues[i][col]);
-      }
-      const boxStartRow = Math.floor(row / 3) * 3;
-      const boxStartCol = Math.floor(col / 3) * 3;
-      for (let i = boxStartRow; i < boxStartRow + 3; i++) {
-          for (let j = boxStartCol; j < boxStartCol + 3; j++) {
-              if (gridValues[i][j] !== 0) candidates.delete(gridValues[i][j]);
-          }
-      }
-      return candidates;
-  };
-
   const startNewGame = useCallback((gameDifficulty) => {
     const { puzzle: newPuzzle, solution: newSolution } = generateSudoku(gameDifficulty);
     
@@ -1282,7 +1964,7 @@ const App = () => {
       for (let r = 0; r < 9; r++) {
         for (let c = 0; c < 9; c++) {
           if (newBoard[r][c].value === 0) {
-            newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
+            newBoard[r][c].autoNotes = calculateCandidates(newBoard, r, c);
           }
         }
       }
@@ -1333,6 +2015,7 @@ const App = () => {
     } else {
       startNewGame(difficulty);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1351,11 +2034,8 @@ const App = () => {
 
   const handleCellClick = (row, col) => {
     if (isGameWon) return;
-    if (hintTargetCell && hintTargetCell.row === row && hintTargetCell.col === col) {
-      clearHintHighlights();
-    }
-    if (activeHint && (activeHint.row !== row || activeHint.col !== col)) {
-        clearProgressiveHint();
+    if (activeHint) {
+      clearAllHintEffects();
     }
     if (selectedCell?.row === row && selectedCell?.col === col) {
       setSelectedCell(null);
@@ -1438,66 +2118,40 @@ const App = () => {
 
   const handleHint = useCallback(() => {
     if (isHintOnCooldown || isGameWon || solution.length === 0) return;
-    let hintActionTaken = false;
-    const isHintableCellSelected = selectedCell && !board[selectedCell.row][selectedCell.col].isInitial && board[selectedCell.row][selectedCell.col].value === 0;
-    if (isHintableCellSelected) {
-        const { row, col } = selectedCell;
-        const candidates = getCandidates(board, row, col);
-        const hasUsedHintOnCell = activeHint && activeHint.row === row && activeHint.col === col;
-        if (candidates.size === 1 || hasUsedHintOnCell) {
-            placeNumberOnBoard(row, col, solution[row][col], true);
-            hintActionTaken = true;
-        } else if (candidates.size > 1) {
-            clearAllHintEffects();
-            setActiveHint({ row, col, level: 1 });
-            const correctAnswer = solution[row][col];
-            const incorrectNotes = Array.from(candidates).filter(n => n !== correctAnswer);
-            const shuffled = incorrectNotes.sort(() => 0.5 - Math.random());
-            const notesToEliminate = shuffled.slice(0, Math.max(1, Math.ceil(shuffled.length / 2)));
-            setHintEffect({ type: 'note-pop', cell: { row, col }, notes: [...notesToEliminate] });
+
+    if (activeHint) {
+        if (activeHint.solve) {
+            const { row, col, num } = activeHint.solve;
+            placeNumberOnBoard(row, col, num, true);
+        } else if (activeHint.eliminations?.length > 0) {
+            setHistory(prev => [...prev, board]);
             const newBoard = deepCopyBoard(board);
-            const cellToUpdate = newBoard[row][col];
-            notesToEliminate.forEach(num => {
+            activeHint.eliminations.forEach(({ row, col, num }) => {
+                const cellToUpdate = newBoard[row][col];
                 cellToUpdate.eliminatedNotes.add(num);
                 cellToUpdate.userNotes.delete(num);
                 cellToUpdate.autoNotes.delete(num);
             });
-            setHistory(prev => [...prev, board]);
             setBoard(newBoard);
-            hintActionTaken = true;
+            setHintEffect({ type: 'note-pop', eliminations: activeHint.eliminations });
         }
+        clearAllHintEffects();
+        return;
+    }
+
+    const hint = findHint(board, difficulty, selectedCell);
+
+    if (hint) {
+        setActiveHint(hint);
+        if (hint.primaryCells.length === 1 && hint.solve) {
+            setHintEffect({ type: 'cell-glow', cell: hint.primaryCells[0] });
+        }
+        startCooldown();
+        setHintUsageCount(prev => prev + 1);
     } else {
-      let candidateCells = [];
-      for (let r = 0; r < 9; r++) { for (let c = 0; c < 9; c++) { if (board[r][c].value === 0) { const candidates = getCandidates(board, r, c); if (candidates.size > 0) candidateCells.push({ row: r, col: c, size: candidates.size }); } } }
-      if (candidateCells.length > 0) {
-        candidateCells.sort((a, b) => a.size - b.size);
-        const tiedCells = candidateCells.filter(cell => cell.size === candidateCells[0].size);
-        let bestCell = (tiedCells.length === 1) ? tiedCells[0] : (() => {
-            let maxScore = -1, scoredCell = null;
-            const gridValues = board.map(row => row.map(cell => cell.value));
-            for (const cell of tiedCells) {
-                let score = 0; const { row, col } = cell;
-                for (let i = 0; i < 9; i++) { if (gridValues[row][i] !== 0) score++; }
-                for (let i = 0; i < 9; i++) { if (gridValues[i][col] !== 0) score++; }
-                const boxStartRow = Math.floor(row / 3) * 3, boxStartCol = Math.floor(col / 3) * 3;
-                for (let r = boxStartRow; r < boxStartRow + 3; r++) { for (let c = boxStartCol; c < boxStartCol + 3; c++) { if (gridValues[r][c] !== 0) score++; } }
-                if (score > maxScore) { maxScore = score; scoredCell = cell; }
-            }
-            return scoredCell;
-        })();
-        if (bestCell) {
-            clearAllHintEffects();
-            setHintTargetCell(bestCell);
-            setHintEffect({ type: 'cell-glow', cell: bestCell });
-            hintActionTaken = true;
-        }
-      }
+        setHintButtonEffect('shake');
     }
-    if (hintActionTaken) {
-      startCooldown();
-      setHintUsageCount(prev => prev + 1);
-    }
-}, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, placeNumberOnBoard, clearAllHintEffects, startCooldown]);
+  }, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, difficulty, placeNumberOnBoard, clearAllHintEffects, startCooldown]);
 
   const handleFillBoard = useCallback(() => {
     if (solution.length === 0) return;
@@ -1530,7 +2184,7 @@ const App = () => {
       for (let r = 0; r < 9; r++) {
         for (let c = 0; c < 9; c++) {
           if (newBoard[r][c].value === 0 && newBoard[r][c].userNotes.size === 0) {
-            newBoard[r][c].autoNotes = getCandidates(newBoard, r, c);
+            newBoard[r][c].autoNotes = calculateCandidates(newBoard, r, c);
           } else {
             newBoard[r][c].autoNotes.clear();
           }
@@ -1596,7 +2250,16 @@ const App = () => {
           onNewGame={() => startNewGame(difficulty)}
         />
       <div className={`min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-32 pb-4 sm:pb-8 px-4`}>
-        <main className={`w-full max-w-lg flex flex-col items-center gap-4 sm:gap-6 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
+        <main className={`w-full max-w-lg flex flex-col items-center gap-2 sm:gap-4 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
+          <div className="relative w-full h-8 mb-1">
+            <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>
+                {activeHint && (
+                    <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>
+                        {activeHint.type}
+                    </div>
+                )}
+            </div>
+          </div>
           <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
             {animationState !== 'idle' && (
               <VictoryScreen 
@@ -1617,7 +2280,7 @@ const App = () => {
               isAutoNotesEnabled={isAutoNotesEnabled}
               isHighlightNotesEnabled={isHighlightNotesEnabled}
               highlightedNumber={highlightedNumber}
-              hintTargetCell={hintTargetCell}
+              activeHint={activeHint}
               hintEffect={hintEffect}
             />
           </div>
@@ -1634,6 +2297,7 @@ const App = () => {
                               isNotesMode={isNotesMode} onToggleNotesMode={handleToggleNotesMode} onUndo={handleUndo}
                               canUndo={history.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown}
                               cooldownDuration={hintCooldownDuration} onDelete={handleDelete} isDarkMode={isDarkMode}
+                              hintButtonEffect={hintButtonEffect}
                           />
                       </div>
                   </div>

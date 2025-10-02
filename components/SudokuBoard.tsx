@@ -6,7 +6,7 @@
 import React from 'react';
 import { Cell } from './Cell.tsx';
 
-export const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, hintTargetCell, hintEffect }) => {
+export const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, isDarkMode, forceDarkMode, isAutoNotesEnabled, isHighlightNotesEnabled, highlightedNumber, activeHint, hintEffect }) => {
   const isDark = isDarkMode || forceDarkMode;
   const outerBorderBgColor = isDark ? 'bg-slate-600' : 'bg-slate-300';
   const thickInnerBorderColor = isDark ? 'bg-slate-500' : 'bg-slate-400';
@@ -51,7 +51,8 @@ export const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNote
                   isHighlighted = isHighlightedByValue || isHighlightedByNote;
                 }
 
-                const isHintTarget = hintTargetCell?.row === rowIndex && hintTargetCell?.col === colIndex;
+                const isHintPrimary = !!activeHint?.primaryCells.some(c => c.row === rowIndex && c.col === colIndex);
+                const isHintSecondary = !!activeHint?.secondaryCells.some(c => c.row === rowIndex && c.col === colIndex);
                 
                 let cellCornerClass = '';
                 if (rowIndex === 0 && colIndex === 0) cellCornerClass = 'rounded-tl-sm';
@@ -73,7 +74,8 @@ export const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNote
                     className={cellCornerClass}
                     isAutoNotesEnabled={isAutoNotesEnabled}
                     highlightedNumber={highlightedNumber}
-                    isHintTarget={isHintTarget}
+                    isHintPrimary={isHintPrimary}
+                    isHintSecondary={isHintSecondary}
                     hintEffect={hintEffect}
                     rowIndex={rowIndex}
                     colIndex={colIndex}
