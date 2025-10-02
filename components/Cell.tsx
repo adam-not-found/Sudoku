@@ -159,14 +159,16 @@ export const Cell: React.FC<CellProps> = ({ data, isSelected, isPeer, isHighligh
                 : 'bg-sky-200 text-sky-800 rounded-sm';
               fontWeightClass = 'font-bold';
             } else {
-              if (isAutoNotesEnabled) {
+              if (isDarkMode && (isHintPrimary || isHintSecondary)) {
+                noteClass = 'text-slate-100';
+              } else if (isAutoNotesEnabled) {
                 if (isUserNote) {
-                  noteClass = isDarkMode ? 'text-sky-500' : 'text-sky-500';
+                  noteClass = isDarkMode ? 'text-sky-300' : 'text-sky-500';
                 } else {
-                  noteClass = isDarkMode ? 'text-slate-500' : 'text-slate-400';
+                  noteClass = isDarkMode ? 'text-slate-300' : 'text-slate-400';
                 }
               } else {
-                noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+                noteClass = isDarkMode ? 'text-slate-200' : 'text-slate-500';
               }
 
               if (isNotesMode) {

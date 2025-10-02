@@ -1,35 +1,35 @@
 <svg width="512" height="512" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <clipPath id="clip">
-      <rect x="2" y="2" width="176" height="176" rx="24"/>
-    </clipPath>
-    <style>
-      .grid { stroke:#dee2e6; stroke-width:3; vector-effect:non-scaling-stroke; stroke-linecap:round; shape-rendering:crispEdges; }
-      .num { font-family:Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:46px; font-weight:700; text-anchor:middle; dominant-baseline:middle; }
-    </style>
-  </defs>
-
   <!-- Outer container -->
-  <rect x="2" y="2" width="176" height="176" rx="24" fill="#ffffff" stroke="#adb5bd" stroke-width="4"/>
+  <rect x="10" y="10" width="160" height="160" rx="24" fill="#ffffff" stroke="#adb5bd" stroke-width="4"/>
 
-  <g clip-path="url(#clip)">
-    <!-- Yellow highlight -->
-    <rect x="60" y="0" width="60" height="60" fill="#F2D87A"/>
+  <!-- Yellow highlight: bottom-left cell -->
+  <rect x="63.3333" y="10" width="53.3333" height="53.3333" fill="#F2D87A"/>
 
-    <!-- 3x3 grid -->
-    <line x1="0" y1="60" x2="180" y2="60" class="grid"/>
-    <line x1="0" y1="120" x2="180" y2="120" class="grid"/>
-    <line x1="60" y1="0" x2="60" y2="180" class="grid"/>
-    <line x1="120" y1="0" x2="120" y2="180" class="grid"/>
-
-    <!-- Numbers -->
-    <text x="30"  y="30"  class="num" fill="#20293A" dy="3">8</text>
-    <text x="150" y="30"  class="num" fill="#3982C4" dy="3">1</text>
-    <text x="30"  y="90"  class="num" fill="#20293A" dy="3">2</text>
-    <text x="90"  y="150" class="num" fill="#DD5549" dy="3">2</text>
-    <text x="150" y="150" class="num" fill="#20293A" dy="3">3</text>
+  <!-- 3x3 grid -->
+  <g stroke-linecap="round" shape-rendering="crispEdges">
+    <g stroke="#dee2e6" stroke-width="1.5" vector-effect="non-scaling-stroke">
+      <!-- horizontals -->
+      <line x1="10" y1="63.3333" x2="170" y2="63.3333"/>
+      <line x1="10" y1="116.6667" x2="170" y2="116.6667"/>
+      <!-- verticals -->
+      <line x1="63.3333" y1="10" x2="63.3333" y2="170"/>
+      <line x1="116.6667" y1="10" x2="116.6667" y2="170"/>
+    </g>
   </g>
 
-  <!-- Border redraw -->
-  <rect x="2" y="2" width="176" height="176" rx="24" fill="none" stroke="#adb5bd" stroke-width="4"/>
+  <!-- Numbers (centered, nudged down by 3px) -->
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+     font-size="46" font-weight="700" text-anchor="middle">
+    <!-- Row 1 -->
+    <text x="36.6667"  y="36.6667" fill="#20293A" dominant-baseline="middle" dy="3">8</text>
+    <text x="143.3333" y="36.6667" fill="#3982C4" dominant-baseline="middle" dy="3">1</text>
+    <!-- Row 2 -->
+    <text x="36.6667"       y="90"      fill="#20293A" dominant-baseline="middle" dy="3">2</text>
+    <!-- Row 3 -->
+    <text x="90"  y="143.3333" fill="#DD5549" dominant-baseline="middle" dy="3">2</text>
+    <text x="143.3333"       y="143.3333" fill="#20293A" dominant-baseline="middle" dy="3">3</text>
+  </g>
+
+  <!-- Crisp border top redraw -->
+  <rect x="10" y="10" width="160" height="160" rx="24" fill="none" stroke="#adb5bd" stroke-width="4"/>
 </svg>
