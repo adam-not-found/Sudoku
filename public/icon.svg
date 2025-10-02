@@ -1,11 +1,36 @@
 <svg width="512" height="512" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
-  <rect width="180" height="180" rx="30" fill="#0ea5e9"/>
-  <g stroke="white">
-    <!-- Thin lines -->
-    <path stroke-width="1.5" d="M20,40 h140 M20,80 h140 M20,120 h140 M20,160 h140 M40,20 v140 M80,20 v140 M120,20 v140 M160,20 v140"/>
-    <!-- Thick lines -->
-    <path stroke-width="4" d="M20,60 h140 M20,140 h140 M60,20 v140 M140,20 v140"/>
-    <!-- Border -->
-    <rect x="20" y="20" width="140" height="140" fill="none" stroke-width="4"/>
-  </g>
+    <!-- Main rounded rectangle with white fill -->
+    <rect x="10" y="10" width="160" height="160" rx="25" fill="white" stroke="#adb5bd" stroke-width="4"/>
+
+    <!-- Yellow highlight for the second cell in the first row -->
+    <rect x="63.33" y="10" width="53.33" height="53.33" fill="#fef08a"/>
+
+    <!-- Grid lines -->
+    <g stroke-linecap="round">
+        <!-- Thin lines -->
+        <g stroke="#dee2e6" stroke-width="1.5">
+            <line x1="10" y1="63.33" x2="170" y2="63.33" />
+            <line x1="10" y1="116.66" x2="170" y2="116.66" />
+            <line x1="63.33" y1="10" x2="63.33" y2="170" />
+            <line x1="116.66" y1="10" x2="116.66" y2="170" />
+        </g>
+    </g>
+    
+    <!-- Numbers -->
+    <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="45" font-weight="700" text-anchor="middle" dominant-baseline="central">
+        <!-- Row 1 -->
+        <text x="36.66" y="36.66" fill="#212529">8</text>
+        <text x="90"    y="36.66" fill="#212529">1</text>
+        <text x="143.33" y="36.66" fill="#ef4444">2</text>
+        <!-- Row 2 -->
+        <text x="36.66" y="90"    fill="#212529">4</text>
+        <text x="90"    y="90"    fill="#212529">3</text>
+        <text x="143.33" y="90"    fill="#212529">5</text>
+        <!-- Row 3 -->
+        <text x="36.66" y="143.33" fill="#3b82f6">7</text>
+        <text x="143.33" y="143.33" fill="#212529">6</text>
+    </g>
+
+    <!-- Re-draw border on top to ensure it's clean -->
+    <rect x="10" y="10" width="160" height="160" rx="25" fill="none" stroke="#adb5bd" stroke-width="4"/>
 </svg>

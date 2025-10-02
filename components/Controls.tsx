@@ -4,26 +4,29 @@
 */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UndoIcon, EraseIcon, NotesIcon, HintIconFull, HintIconEmpty } from './icons.tsx';
+import { UndoIcon, RedoIcon, EraseIcon, NotesIcon, HintIconFull, HintIconEmpty } from './icons.tsx';
 
 export const Controls = ({ 
   isNotesMode, 
   onToggleNotesMode, 
   onUndo, 
   canUndo,
+  onRedo,
+  canRedo,
   onHint, 
   isHintOnCooldown,
   cooldownDuration,
   onDelete,
-  isDarkMode
+  isDarkMode,
+  hintButtonEffect
 }) => {
-  const [animation, setAnimation] = useState(null);
+  const [popAnimation, setPopAnimation] = useState(false);
   const prevCooldown = useRef(isHintOnCooldown);
   const animationKey = useRef(0);
 
   useEffect(() => {
     if (prevCooldown.current && !isHintOnCooldown) {
-      setAnimation('refill');
+      setPopAnimation(true);
     }
     prevCooldown.current = isHintOnCooldown;
   }, [isHintOnCooldown]);
@@ -31,7 +34,6 @@ export const Controls = ({
   const handleHintClick = () => {
     if (isHintOnCooldown) return;
     animationKey.current += 1;
-    setAnimation('pop');
     onHint();
   };
 
@@ -43,8 +45,9 @@ export const Controls = ({
     ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' 
     : iconButtonClasses;
   const hintHoverClass = isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80');
-  const animationClass = animation === 'pop' ? 'animate-hint-pop' : animation === 'refill' ? 'animate-hint-refill' : '';
-
+  const hintButtonAnimationClass = hintButtonEffect === 'shake' ? 'animate-shake' : '';
+  const popAnimationClass = popAnimation ? 'animate-hint-refill' : '';
+  
   return (
     <div className={`rounded-full p-2 flex justify-center items-center gap-2 shadow-lg transition-colors duration-300 ${containerClasses}`}>
       <button 
@@ -55,6 +58,16 @@ export const Controls = ({
       >
         <UndoIcon />
       </button>
+      <div className={`transition-all duration-300 ease-in-out ${canRedo ? 'w-12 mx-1 opacity-100' : 'w-0 opacity-0'}`}>
+        <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`${baseButtonClasses} ${iconButtonClasses}`}
+            aria-label="Redo last move"
+        >
+            <RedoIcon />
+        </button>
+      </div>
       <button 
         onClick={onDelete}
         className={`${baseButtonClasses} ${iconButtonClasses}`}
@@ -72,8 +85,8 @@ export const Controls = ({
       <button 
         onClick={handleHintClick}
         disabled={isHintOnCooldown}
-        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${animationClass}`}
-        onAnimationEnd={() => setAnimation(null)}
+        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${hintButtonAnimationClass} ${popAnimationClass}`}
+        onAnimationEnd={() => setPopAnimation(false)}
         aria-label={isHintOnCooldown ? "Hint is on cooldown" : "Get a hint"}
       >
         <div className="relative w-full h-full flex items-center justify-center">

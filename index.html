@@ -352,6 +352,15 @@ const UndoIcon = () => (
   </svg>
 );
 
+const RedoIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <g transform="translate(2, 2)">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 15v-3.375A4.125 4.125 0 019.125 7.5H15.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.75 11.25L15.5 7.5l-3.75-3.75" />
+    </g>
+  </svg>
+);
+
 const EraseIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -569,7 +578,7 @@ const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, 
   return (
     <div className={`relative transition-all duration-300 ease-in-out aspect-square w-full transform-gpu ${isNotesMode ? 'scale-[1.03]' : ''}`}>
       <div className={`absolute inset-0 rounded-2xl ${outerBorderBgColor}`}></div>
-      <div className={`absolute inset-[6px] grid grid-cols-3 grid-rows-3 gap-0.5 ${thickInnerBorderColor} rounded-xl overflow-hidden`}>
+      <div className={`absolute inset-[6px] grid grid-cols-3 grid-rows-3 gap-[2px] ${thickInnerBorderColor} rounded-xl overflow-hidden`}>
         {Array.from({ length: 9 }).map((_, boxIndex) => {
           const boxRowStart = Math.floor(boxIndex / 3) * 3;
           const boxColStart = (boxIndex % 3) * 3;
@@ -581,7 +590,7 @@ const SudokuBoard = ({ board, solution, selectedCell, onCellClick, isNotesMode, 
           if (boxIndex === 8) boxCornerClass = 'rounded-br-xl';
 
           return (
-            <div key={boxIndex} className={`grid grid-cols-3 grid-rows-3 gap-0.5 ${thinInnerBorderColor} ${boxCornerClass}`}>
+            <div key={boxIndex} className={`grid grid-cols-3 grid-rows-3 gap-[1px] ${thinInnerBorderColor} ${boxCornerClass}`}>
               {Array.from({ length: 9 }).map((_, cellInBoxIndex) => {
                 const cellRow = Math.floor(cellInBoxIndex / 3);
                 const cellCol = cellInBoxIndex % 3;
@@ -690,6 +699,8 @@ const Controls = ({
   onToggleNotesMode, 
   onUndo, 
   canUndo,
+  onRedo,
+  canRedo,
   onHint, 
   isHintOnCooldown,
   cooldownDuration,
@@ -726,25 +737,35 @@ const Controls = ({
   const popAnimationClass = popAnimation ? 'animate-hint-refill' : '';
   
   return (
-    <div className={`rounded-full p-2 flex justify-center items-center gap-2 shadow-lg transition-colors duration-300 ${containerClasses}`}>
+    <div className={`rounded-full p-2 flex justify-center items-center shadow-lg transition-colors duration-300 ${containerClasses}`}>
       <button 
         onClick={onUndo}
         disabled={!canUndo}
-        className={`${baseButtonClasses} ${iconButtonClasses}`}
+        className={`${baseButtonClasses} ${iconButtonClasses} ${canRedo ? 'mr-1' : 'mr-2'} `}
         aria-label="Undo last move"
       >
         <UndoIcon />
       </button>
+      <div className={`transition-all duration-300 ease-in-out flex items-center justify-center ${canRedo ? 'w-12 opacity-100' : 'w-0 opacity-0'}`} style={{transitionProperty: 'width, opacity'}}>
+        <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`${baseButtonClasses} ${iconButtonClasses}`}
+            aria-label="Redo last move"
+        >
+            <RedoIcon />
+        </button>
+      </div>
       <button 
         onClick={onDelete}
-        className={`${baseButtonClasses} ${iconButtonClasses}`}
+        className={`${baseButtonClasses} ${iconButtonClasses} ml-1`}
         aria-label="Delete number or notes"
       >
         <EraseIcon />
       </button>
       <button 
         onClick={onToggleNotesMode}
-        className={`${baseButtonClasses} ${notesButtonDynamicClasses}`}
+        className={`${baseButtonClasses} ${notesButtonDynamicClasses} ml-2`}
         aria-label={`Toggle notes mode, currently ${isNotesMode ? 'on' : 'off'}`}
       >
         <NotesIcon />
@@ -752,7 +773,7 @@ const Controls = ({
       <button 
         onClick={handleHintClick}
         disabled={isHintOnCooldown}
-        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${hintButtonAnimationClass} ${popAnimationClass}`}
+        className={`${baseButtonClasses} ${hintIconClasses} ${hintHoverClass} ${hintButtonAnimationClass} ${popAnimationClass} ml-2`}
         onAnimationEnd={() => setPopAnimation(false)}
         aria-label={isHintOnCooldown ? "Hint is on cooldown" : "Get a hint"}
       >
@@ -1887,6 +1908,7 @@ const App = () => {
   const [selectedCell, setSelectedCell] = useState(null);
   const [isNotesMode, setIsNotesMode] = useState(false);
   const [history, setHistory] = useState([]);
+  const [redoHistory, setRedoHistory] = useState([]);
   const [isGameWon, setIsGameWon] = useState(false);
   const [animationState, setAnimationState] = useState('idle');
   const [victoryMessage, setVictoryMessage] = useState('');
@@ -2060,6 +2082,7 @@ const App = () => {
     setSelectedCell(null);
     setIsNotesMode(false);
     setHistory([]);
+    setRedoHistory([]);
     setIsGameWon(false);
     setAnimationState('idle');
     clearAllHintEffects();
@@ -2084,7 +2107,8 @@ const App = () => {
         setBoard(savedGame.board);
         setPuzzle(savedGame.puzzle);
         setSolution(savedGame.solution);
-        setHistory(savedGame.history);
+        setHistory(savedGame.history || []);
+        setRedoHistory(savedGame.redoHistory || []);
         setStartTime(savedGame.startTime);
         setMovesCount(savedGame.movesCount);
         setMistakesCount(savedGame.mistakesCount);
@@ -2106,9 +2130,9 @@ const App = () => {
 
   useEffect(() => {
     if (board.length === 0 || isGameWon) return;
-    const gameState = { board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, hintUsageCount };
+    const gameState = { board, puzzle, solution, history, redoHistory, startTime, movesCount, mistakesCount, difficulty, hintUsageCount };
     localStorage.setItem(SAVED_GAME_KEY, JSON.stringify(gameState, serializeSets));
-  }, [board, puzzle, solution, history, startTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
+  }, [board, puzzle, solution, history, redoHistory, startTime, movesCount, mistakesCount, difficulty, isGameWon, hintUsageCount]);
   
   useEffect(() => {
     if (isGameWon) {
@@ -2132,6 +2156,7 @@ const App = () => {
 
   const placeNumberOnBoard = useCallback((row, col, num, isFromHint = false) => {
     setHistory(prev => [...prev, board]);
+    setRedoHistory([]);
     clearAllHintEffects();
     const newBoard = deepCopyBoard(board);
     const cell = newBoard[row][col];
@@ -2168,6 +2193,7 @@ const App = () => {
         if (cellData.eliminatedNotes.has(num)) return;
         if (!cellData.eliminatedNotes.has(num)) {
             setHistory(prev => [...prev, board]);
+            setRedoHistory([]);
             clearAllHintEffects();
             const newBoard = deepCopyBoard(board);
             const cell = newBoard[row][col];
@@ -2183,12 +2209,22 @@ const App = () => {
   }, [board, isNotesMode, selectedCell, isGameWon, solution, clearAllHintEffects, placeNumberOnBoard]);
   
   const handleToggleNotesMode = useCallback(() => { if (!isGameWon) setIsNotesMode(prev => !prev); }, [isGameWon]);
+  
   const handleUndo = useCallback(() => {
     if (history.length === 0 || isGameWon) return;
+    setRedoHistory(prev => [...prev, board]);
     setBoard(history[history.length - 1]);
     setHistory(history.slice(0, -1));
     clearAllHintEffects();
-  }, [history, isGameWon, clearAllHintEffects]);
+  }, [board, history, isGameWon, clearAllHintEffects]);
+
+  const handleRedo = useCallback(() => {
+    if (redoHistory.length === 0 || isGameWon) return;
+    setHistory(prev => [...prev, board]);
+    setBoard(redoHistory[redoHistory.length - 1]);
+    setRedoHistory(redoHistory.slice(0, -1));
+    clearAllHintEffects();
+  }, [board, redoHistory, isGameWon, clearAllHintEffects]);
 
   const handleDelete = useCallback(() => {
     if (!selectedCell || isGameWon) return;
@@ -2196,6 +2232,7 @@ const App = () => {
     const cellToDelete = board[row][col];
     if (cellToDelete.isInitial || (cellToDelete.value === 0 && cellToDelete.userNotes.size === 0 && cellToDelete.autoNotes.size === 0 && cellToDelete.eliminatedNotes.size === 0)) return;
     setHistory(prev => [...prev, board]);
+    setRedoHistory([]);
     clearAllHintEffects();
     const newBoard = deepCopyBoard(board);
     const cell = newBoard[row][col];
@@ -2214,6 +2251,7 @@ const App = () => {
             placeNumberOnBoard(row, col, num, true);
         } else if (activeHint.eliminations?.length > 0) {
             setHistory(prev => [...prev, board]);
+            setRedoHistory([]);
             const newBoard = deepCopyBoard(board);
             activeHint.eliminations.forEach(({ row, col, num }) => {
                 const cellToUpdate = newBoard[row][col];
@@ -2283,6 +2321,7 @@ const App = () => {
       newBoard.forEach(row => row.forEach(cell => cell.autoNotes.clear()));
     }
     setHistory(prev => [...prev, board]);
+    setRedoHistory([]);
     setBoard(newBoard);
   };
   
@@ -2384,7 +2423,8 @@ const App = () => {
                       <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
                           <Controls 
                               isNotesMode={isNotesMode} onToggleNotesMode={handleToggleNotesMode} onUndo={handleUndo}
-                              canUndo={history.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown}
+                              canUndo={history.length > 0} onRedo={handleRedo} canRedo={redoHistory.length > 0}
+                              onHint={handleHint} isHintOnCooldown={isHintOnCooldown}
                               cooldownDuration={hintCooldownDuration} onDelete={handleDelete} isDarkMode={isDarkMode}
                               hintButtonEffect={hintButtonEffect}
                           />
