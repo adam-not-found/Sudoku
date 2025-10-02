@@ -173,88 +173,174 @@ const solveGrid = (grid) => {
 };
 
 const countSolutions = (grid) => {
-  function findEmpty(g) {
+  let count = 0;
+  function solve() {
+    if (count > 1) return;
+
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 9; c++) {
-        if (g[r][c] === 0) return [r, c];
-      }
-    }
-    return null;
-  }
-
-  function solve() {
-    const emptyPos = findEmpty(grid);
-    if (!emptyPos) {
-      return 1; // Solution found
-    }
-    
-    const [row, col] = emptyPos;
-    let count = 0;
-    
-    for (let num = 1; num <= 9; num++) {
-      if (isSafe(grid, row, col, num)) {
-        grid[row][col] = num;
-        count += solve();
-        if (count > 1) {
-          break; // Optimization: stop counting if we have more than one solution
+        if (grid[r][c] === 0) {
+          for (let num = 1; num <= 9; num++) {
+            if (isSafe(grid, r, c, num)) {
+              grid[r][c] = num;
+              solve();
+              grid[r][c] = 0; // Backtrack
+            }
+          }
+          return; // Finished with this empty cell
         }
       }
     }
-    
-    grid[row][col] = 0; // Backtrack
-    return count;
+    count++;
   }
-  
-  return solve();
+  solve();
+  return count;
 };
 
-const DIFFICULTY_LEVELS = {
+const REMOVAL_COUNT = {
   easy: 40,
   medium: 48,
   hard: 54,
   professional: 58,
 };
 
+const DIFFICULTY_SCORES = {
+  easy: { min: 1, max: 2 },
+  medium: { min: 3, max: 4 },
+  hard: { min: 5, max: 7 },
+  professional: { min: 8, max: 99 },
+};
+
+const ratePuzzleDifficulty = (puzzle) => {
+    let board = puzzle.map(row =>
+      row.map(value => ({
+        value,
+        eliminatedNotes: new Set(),
+      }))
+    );
+
+    let maxScore = 0;
+    let stuck = false;
+
+    while (!stuck) {
+        let moveMade = false;
+        
+        const techniques = [
+            { func: findNakedSingle, score: 1 },
+            { func: findHiddenSingle, score: 2 },
+            { func: findNakedPair, score: 3 },
+            { func: findHiddenPair, score: 4 },
+            { func: findNakedTriple, score: 5 },
+            { func: findHiddenTriple, score: 6 },
+            { func: findIntersectionRemoval, score: 7 },
+            { func: findXWing, score: 8 },
+            { func: findSwordfish, score: 9 },
+        ];
+        
+        for (const technique of techniques) {
+            const hint = technique.func(board, null);
+            if (hint) {
+                maxScore = Math.max(maxScore, technique.score);
+                
+                if (hint.solve) {
+                    const { row, col, num } = hint.solve;
+                    board[row][col].value = num;
+                    board[row][col].eliminatedNotes.clear();
+                } else if (hint.eliminations.length > 0) {
+                    hint.eliminations.forEach(({ row, col, num }) => {
+                        board[row][col].eliminatedNotes.add(num);
+                    });
+                }
+                
+                moveMade = true;
+                break; // Restart scan from easiest technique
+            }
+        }
+
+        if (!moveMade) {
+            stuck = true;
+        }
+    }
+
+    const isSolved = board.every(row => row.every(cell => cell.value !== 0));
+    return isSolved ? maxScore : 99; // 99 for puzzles needing harder techniques
+};
+
 const generateSudoku = (difficulty = 'medium') => {
-  const solution = Array(9).fill(0).map(() => Array(9).fill(0));
-  solveGrid(solution);
-  
-  const puzzle = solution.map(row => [...row]);
-  
-  // Create a list of all cell coordinates and shuffle them to randomize removal
-  const cells = [];
-  for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) {
-      cells.push({ r, c });
+  let puzzle, solution;
+  let attempts = 0;
+  const targetDifficulty = DIFFICULTY_SCORES[difficulty];
+
+  while(attempts < 100) { // Safety break after 100 tries
+    attempts++;
+    
+    solution = Array(9).fill(0).map(() => Array(9).fill(0));
+    solveGrid(solution);
+    
+    const candidatePuzzle = solution.map(row => [...row]);
+    const cells = [];
+    for (let r = 0; r < 9; r++) { for (let c = 0; c < 9; c++) { cells.push({ r, c }); } }
+    shuffle(cells);
+
+    let removedCount = 0;
+    const cellsToRemove = REMOVAL_COUNT[difficulty] ?? 48;
+
+    for (const cell of cells) {
+      if (removedCount >= cellsToRemove) { break; }
+      
+      const { r, c } = cell;
+      const backup = candidatePuzzle[r][c];
+      candidatePuzzle[r][c] = 0;
+      
+      const puzzleCopy = candidatePuzzle.map(row => [...row]);
+      const numSolutions = countSolutions(puzzleCopy);
+      
+      if (numSolutions !== 1) {
+        candidatePuzzle[r][c] = backup;
+      } else {
+        removedCount++;
+      }
+    }
+
+    const puzzleScore = ratePuzzleDifficulty(candidatePuzzle);
+
+    if (puzzleScore >= targetDifficulty.min && puzzleScore <= targetDifficulty.max) {
+      puzzle = candidatePuzzle;
+      break; 
     }
   }
-  shuffle(cells);
 
-  let removedCount = 0;
-  const cellsToRemove = DIFFICULTY_LEVELS[difficulty] ?? 48;
+  // Fallback if a suitable puzzle isn't found
+  if (!puzzle) {
+    console.warn(`Could not generate a '${difficulty}' puzzle with guaranteed difficulty. Using fallback.`);
+    solution = Array(9).fill(0).map(() => Array(9).fill(0));
+    solveGrid(solution);
+    puzzle = solution.map(row => [...row]);
+    
+    const cells = [];
+    for (let r = 0; r < 9; r++) { for (let c = 0; c < 9; c++) { cells.push({ r, c }); } }
+    shuffle(cells);
 
-  for (const cell of cells) {
-    if (removedCount >= cellsToRemove) {
-      break;
-    }
-    
-    const { r, c } = cell;
-    const backup = puzzle[r][c];
-    puzzle[r][c] = 0;
-    
-    const puzzleCopy = puzzle.map(row => [...row]);
-    const numSolutions = countSolutions(puzzleCopy);
-    
-    if (numSolutions !== 1) {
-      // This removal makes the puzzle invalid (0 or >1 solutions). Put the number back.
-      puzzle[r][c] = backup;
-    } else {
-      removedCount++;
+    let removedCount = 0;
+    const cellsToRemove = REMOVAL_COUNT[difficulty] ?? 48;
+
+    for (const cell of cells) {
+        if (removedCount >= cellsToRemove) break;
+        const { r, c } = cell;
+        const backup = puzzle[r][c];
+        puzzle[r][c] = 0;
+        const puzzleCopy = puzzle.map(row => [...row]);
+        if (countSolutions(puzzleCopy) !== 1) {
+            puzzle[r][c] = backup;
+        } else {
+            removedCount++;
+        }
     }
   }
-
+  
   return { puzzle, solution };
 };
+
 
 // From components/icons.tsx
 const UndoIcon = () => (
@@ -2056,6 +2142,9 @@ const App = () => {
     cell.isWrong = !isCorrect;
     if (!isCorrect && !isFromHint) setMistakesCount(prev => prev + 1);
     if (isCorrect) {
+        if (!isFromHint) {
+            setSelectedCell(null);
+        }
         for (let c = 0; c < 9; c++) { newBoard[row][c].userNotes.delete(num); newBoard[row][c].autoNotes.delete(num); }
         for (let r = 0; r < 9; r++) { newBoard[r][col].userNotes.delete(num); newBoard[r][col].autoNotes.delete(num); }
         const boxStartRow = Math.floor(row / 3) * 3;
