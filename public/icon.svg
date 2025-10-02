@@ -3,7 +3,7 @@
   <rect x="10" y="10" width="160" height="160" rx="24" fill="#ffffff" stroke="#adb5bd" stroke-width="4"/>
 
   <!-- Yellow highlight: bottom-left cell -->
-  <rect x="10" y="116.6667" width="53.3333" height="53.3333" fill="#F2D87A"/>
+  <rect x="63.3333" y="10" width="53.3333" height="53.3333" fill="#F2D87A"/>
 
   <!-- 3x3 grid -->
   <g stroke-linecap="round" shape-rendering="crispEdges">
@@ -24,7 +24,7 @@
     <text x="36.6667"  y="36.6667" fill="#20293A" dominant-baseline="middle" dy="3">8</text>
     <text x="143.3333" y="36.6667" fill="#3982C4" dominant-baseline="middle" dy="3">1</text>
     <!-- Row 2 -->
-    <text x="936.6667"       y="90"      fill="#20293A" dominant-baseline="middle" dy="3">2</text>
+    <text x="36.6667"       y="90"      fill="#20293A" dominant-baseline="middle" dy="3">2</text>
     <!-- Row 3 -->
     <text x="90"  y="143.3333" fill="#DD5549" dominant-baseline="middle" dy="3">2</text>
     <text x="143.3333"       y="143.3333" fill="#20293A" dominant-baseline="middle" dy="3">3</text>
