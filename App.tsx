@@ -292,27 +292,27 @@ export default function App() {
   }
   
   const highlightedNum = selectedCell && board[selectedCell.row][selectedCell.col].value > 0 ? board[selectedCell.row][selectedCell.col].value : null;
-  const hintDisplay = <div className="relative w-full h-8"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>{activeHint.type}</div>}</div></div>;
-  const timerDisplay = <div className="relative w-full h-8 flex items-center justify-center">{!isGameWon && <div className={`px-3 py-1 rounded-full text-lg font-semibold transition-colors ${isDarkMode ? 'bg-slate-700/80 text-slate-300' : 'bg-slate-200/80 text-slate-600'}`}>{formatTime(elapsedTime)}</div>}</div>;
+  const hintDisplay = <div className="relative w-full h-6 mb-2"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>{activeHint.type}</div>}</div></div>;
+  const timerDisplay = <div className="relative w-full h-6 mb-3 flex items-center justify-center">{!isGameWon && <div className={`px-3 py-1 rounded-full text-lg font-semibold transition-colors ${isDarkMode ? 'bg-slate-700/80 text-slate-300' : 'bg-slate-200/80 text-slate-600'}`}>{formatTime(elapsedTime)}</div>}</div>;
 
   return (
     <div className="min-h-screen font-sans relative" onClick={() => setSelectedCell(null)}>
       <Header isDarkMode={isDarkMode} onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onNewGame={() => startNewGame(difficulty)} />
       <div className={`min-h-screen flex flex-col items-center justify-center pt-24 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
-        <main className={`w-full max-w-lg flex flex-col items-center gap-2 sm:gap-4 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
+        <main className={`w-full max-w-lg flex flex-col items-center gap-1 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
             {isTimerVisible ? timerDisplay : hintDisplay}
             <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
               {animationState !== 'idle' && <VictoryScreen message={victoryMessage} moves={movesCount} time={formatTime(elapsedTime)} mistakes={mistakesCount} />}
               <SudokuBoard board={board} solution={solution} selectedCell={selectedCell} onCellClick={(r, c) => { if (isGameWon) return; if (activeHint) setActiveHint(null); setSelectedCell(p => p?.row === r && p?.col === c ? null : {row: r, col: c})}} isNotesMode={isNotesMode} isDarkMode={isDarkMode} forceDarkMode={isGameWon} isAutoNotesEnabled={isAutoNotesEnabled} isHighlightNotesEnabled={isHighlightNotesEnabled} highlightedNumber={highlightedNum} activeHint={activeHint} hintEffect={hintEffect} />
             </div>
-            {isTimerVisible ? hintDisplay : <div className="w-full h-8" />}
-            <div className="relative w-full flex flex-col items-center gap-2">
-              <div className={`w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
-                <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`}><NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} /></div>
+            {isTimerVisible ? hintDisplay : <div className="w-full h-2" />}
+            <div className="relative w-full flex flex-col items-center gap-0">
+              <div className={`w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`}>
+                <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}><NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} /></div>
               </div>
               <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
-                <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`} onClick={(e) => e.stopPropagation()}>
-                  <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`}>
+                <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`}>
+                  <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
                     <Controls isNotesMode={isNotesMode} onToggleNotesMode={() => setIsNotesMode(p => !p)} onUndo={() => {if(history.length>0){setRedoHistory(p=>[...p,board]); setBoard(history[history.length-1]); setHistory(history.slice(0,-1)); setActiveHint(null);}}} canUndo={history.length>0} onRedo={() => {if(redoHistory.length>0){setHistory(p=>[...p,board]); setBoard(redoHistory[redoHistory.length-1]); setRedoHistory(redoHistory.slice(0,-1)); setActiveHint(null);}}} canRedo={redoHistory.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown} cooldownDuration={4} onDelete={handleDelete} isDarkMode={isDarkMode} hintButtonEffect={hintButtonEffect} />
                   </div>
                 </div>

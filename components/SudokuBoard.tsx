@@ -25,18 +25,16 @@ export default function SudokuBoard({ board, solution, selectedCell, onCellClick
               }
               
               return (
-                // FIX: Wrap Cell in a div and move the key to the wrapper to resolve TypeScript error.
-                <div key={`${rowIndex}-${colIndex}`}>
-                  <Cell
-                    data={cellData} isSelected={isSelected} isPeer={isPeer && !isSelected}
-                    isHighlighted={isHighlighted} isCorrect={!cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex]}
-                    onClick={() => onCellClick(rowIndex, colIndex)} isDarkMode={isDark} isNotesMode={isNotesMode}
-                    isAutoNotesEnabled={isAutoNotesEnabled} highlightedNumber={highlightedNumber}
-                    isHintPrimary={!!activeHint?.primaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
-                    isHintSecondary={!!activeHint?.secondaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
-                    hintEffect={hintEffect} rowIndex={rowIndex} colIndex={colIndex}
-                  />
-                </div>
+                <Cell
+                  key={`${rowIndex}-${colIndex}`}
+                  data={cellData} isSelected={isSelected} isPeer={isPeer && !isSelected}
+                  isHighlighted={isHighlighted} isCorrect={!cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex]}
+                  onClick={() => onCellClick(rowIndex, colIndex)} isDarkMode={isDark} isNotesMode={isNotesMode}
+                  isAutoNotesEnabled={isAutoNotesEnabled} highlightedNumber={highlightedNumber}
+                  isHintPrimary={!!activeHint?.primaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
+                  isHintSecondary={!!activeHint?.secondaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
+                  hintEffect={hintEffect} rowIndex={rowIndex} colIndex={colIndex}
+                />
               );
             })}
           </div>
