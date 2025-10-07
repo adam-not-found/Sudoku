@@ -41,6 +41,7 @@ export default function App() {
   const [mistakesCount, setMistakesCount] = useState(0);
   const [isTimerVisible, setIsTimerVisible] = useState(() => localStorage.getItem('sudoku-timer-visible') === 'true');
   const [highlightedNumPad, setHighlightedNumPad] = useState(null);
+  const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
 
   const isUIBlocked = isSettingsOpen || isStatsOpen;
 
@@ -226,6 +227,13 @@ export default function App() {
     }
   };
 
+  const handleToggleNewGameConfirm = useCallback((e) => {
+    if (e) e.stopPropagation();
+    if (!isGameWon) {
+        setShowNewGameConfirm(p => !p);
+    }
+  }, [isGameWon]);
+
   useEffect(() => {
     const serialize = (k, v) => v instanceof Set ? { __dataType: 'Set', value: [...v] } : v;
     const deserialize = (k, v) => v?.__dataType === 'Set' ? new Set(v.value) : v;
@@ -315,8 +323,8 @@ export default function App() {
   const hintDisplay = <div className="relative w-full h-6 mb-2"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>{activeHint.type}</div>}</div></div>;
 
   return (
-    <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); }}>
-      <Header isDarkMode={isDarkMode} onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onNewGame={() => startNewGame(difficulty)} />
+    <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); setShowNewGameConfirm(false); }}>
+      <Header isDarkMode={isDarkMode} onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onTitleClick={handleToggleNewGameConfirm} isNewGameConfirmOpen={showNewGameConfirm} />
       <div className={`min-h-screen flex flex-col items-center justify-start pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
         <main className={`w-full max-w-lg flex flex-col items-center gap-2 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''} mt-8`}>
             {hintDisplay}
@@ -329,21 +337,50 @@ export default function App() {
                 <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}><NumberPad onNumberClick={handleNumPadAction} isNotesMode={isNotesMode} isDarkMode={isDarkMode} highlightedNumber={highlightedNumPad} /></div>
               </div>
               <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
-                <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`}>
-                  <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-4">
-                        <Controls isNotesMode={isNotesMode} onToggleNotesMode={() => setIsNotesMode(p => !p)} onUndo={() => {if(history.length>0){setRedoHistory(p=>[...p,board]); setBoard(history[history.length-1]); setHistory(history.slice(0,-1)); setActiveHint(null);}}} canUndo={history.length>0} onRedo={() => {if(redoHistory.length>0){setHistory(p=>[...p,board]); setBoard(redoHistory[redoHistory.length-1]); setRedoHistory(redoHistory.slice(0,-1)); setActiveHint(null);}}} canRedo={redoHistory.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown} cooldownDuration={4} onDelete={handleDelete} isDarkMode={isDarkMode} hintButtonEffect={hintButtonEffect} />
+
+                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}} onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => startNewGame(difficulty)} className="bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 shadow-lg"><span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>Play Again</span></button>
+                </div>
+                
+                <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                    <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                        <div className={`relative rounded-full p-2 shadow-lg transition-colors duration-300 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-800'}`}>
+                            {/* Controls Icons */}
+                            <div className={`transition-all duration-200 ease-out ${showNewGameConfirm ? 'opacity-0 blur-sm scale-90' : 'opacity-100 blur-0 scale-100'}`}>
+                                <Controls
+                                    isNotesMode={isNotesMode}
+                                    onToggleNotesMode={() => setIsNotesMode(p => !p)}
+                                    onUndo={() => {if(history.length>0){setRedoHistory(p=>[...p,board]); setBoard(history[history.length-1]); setHistory(history.slice(0,-1)); setActiveHint(null);}}}
+                                    canUndo={history.length>0}
+                                    onRedo={() => {if(redoHistory.length>0){setHistory(p=>[...p,board]); setBoard(redoHistory[redoHistory.length-1]); setRedoHistory(redoHistory.slice(0,-1)); setActiveHint(null);}}}
+                                    canRedo={redoHistory.length > 0}
+                                    onHint={handleHint}
+                                    isHintOnCooldown={isHintOnCooldown}
+                                    cooldownDuration={4}
+                                    onDelete={handleDelete}
+                                    isDarkMode={isDarkMode}
+                                    hintButtonEffect={hintButtonEffect}
+                                />
+                            </div>
+                            {/* New Game Button */}
+                            <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ease-in ${showNewGameConfirm ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} style={{transitionDelay: showNewGameConfirm ? '200ms' : '0ms'}}>
+                                <button
+                                    onClick={() => { startNewGame(difficulty); setShowNewGameConfirm(false); }}
+                                    className="w-full h-full text-white font-bold text-2xl"
+                                >
+                                    New Game
+                                </button>
+                            </div>
+                        </div>
+
                         {isTimerVisible && !isGameWon && (
                             <div className={`h-12 flex items-center justify-center px-4 rounded-full text-lg font-semibold tabular-nums tracking-wider transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
                                 {formatTime(elapsedTime)}
                             </div>
                         )}
                     </div>
-                  </div>
                 </div>
-                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}} onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => startNewGame(difficulty)} className="bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 shadow-lg"><span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>Play Again</span></button>
-                </div>
+
               </div>
             </div>
         </main>

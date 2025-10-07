@@ -17,7 +17,7 @@ export default function Controls({ isNotesMode, onToggleNotesMode, onUndo, canUn
   const iconBtnClasses = isDarkMode ? 'text-slate-300 hover:bg-slate-600/80' : 'text-slate-300 hover:bg-slate-700/80';
   
   return (
-    <div className={`rounded-full p-2 flex justify-center items-center shadow-lg transition-colors duration-300 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-800'}`}>
+    <div className="flex justify-center items-center">
       <button onClick={onUndo} disabled={!canUndo} className={`${baseClasses} ${iconBtnClasses} ${canRedo ? 'mr-1' : 'mr-2'}`} aria-label="Undo"><UndoIcon /></button>
       <div className={`transition-all duration-300 ease-in-out flex items-center justify-center ${canRedo ? 'w-12 opacity-100' : 'w-0 opacity-0'}`} style={{transitionProperty: 'width, opacity'}}>
         <button onClick={onRedo} disabled={!canRedo} className={`${baseClasses} ${iconBtnClasses}`} aria-label="Redo"><RedoIcon /></button>
