@@ -9,7 +9,7 @@ function StatItem({ label, value }) {
     );
 }
 
-export default function VictoryScreen({ message, moves, time, mistakes }) {
+export default function VictoryScreen({ message, moves, time, mistakes, hints }) {
   const [showContainer, setShowContainer] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -27,10 +27,11 @@ export default function VictoryScreen({ message, moves, time, mistakes }) {
     <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
       <div className={`w-auto min-w-[320px] max-w-sm flex flex-col items-center gap-6 bg-sky-200/65 backdrop-blur p-8 rounded-2xl shadow-2xl transition-all duration-500 ease-in-out ${showContainer ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-4 scale-95'}`}>
         <h2 className={`text-center font-bold text-slate-800 transition-all duration-500 ease-in-out ${titleSize} ${showTitle ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>{message}</h2>
-        <div className={`flex justify-center gap-x-8 sm:gap-x-12 transition-all duration-500 ease-in-out ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className={`flex justify-center gap-x-6 sm:gap-x-8 transition-all duration-500 ease-in-out ${showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <StatItem label="Time" value={time} />
           <StatItem label="Moves" value={moves} />
           <StatItem label="Mistakes" value={mistakes} />
+          <StatItem label="Hints" value={hints} />
         </div>
       </div>
     </div>

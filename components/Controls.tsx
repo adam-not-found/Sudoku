@@ -24,7 +24,7 @@ export default function Controls({ isNotesMode, onToggleNotesMode, onUndo, canUn
       </div>
       <button onClick={onDelete} className={`${baseClasses} ${iconBtnClasses} ml-1`} aria-label="Delete"><EraseIcon /></button>
       <button onClick={onToggleNotesMode} className={`${baseClasses} ${isNotesMode ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)]' : iconBtnClasses} ml-2`} aria-label="Notes Mode"><NotesIcon /></button>
-      <button onClick={handleHintClick} disabled={isHintOnCooldown} className={`${baseClasses} ${isDarkMode ? 'text-amber-400' : 'text-amber-300'} ${isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80')} ${hintButtonEffect === 'shake' ? 'animate-shake' : ''} ${popAnimation ? 'animate-hint-refill' : ''} ml-2`} onAnimationEnd={() => setPopAnimation(false)} aria-label="Hint">
+      <button onClick={handleHintClick} disabled={isHintOnCooldown} className={`${baseClasses} ${isDarkMode ? 'text-amber-400' : 'text-amber-300'} ${isHintOnCooldown ? '' : (isDarkMode ? 'hover:bg-slate-600/80' : 'hover:bg-slate-700/80')} ${hintButtonEffect === 'shake' ? 'animate-shake' : ''} ${popAnimation ? 'animate-pop' : ''} ml-2`} onAnimationEnd={() => setPopAnimation(false)} aria-label="Hint">
         <div className="relative w-full h-full flex items-center justify-center">
           {isHintOnCooldown ? (<><HintIconEmpty /><div key={animationKey.current} className="absolute w-full h-full flex items-center justify-center animate-fill-up" style={{ animationDuration: `${cooldownDuration}s` }}><HintIconFull /></div></>) : <HintIconFull />}
         </div>

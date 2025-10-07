@@ -107,6 +107,8 @@ const ratePuzzleDifficulty = (puzzle) => {
             { id: 'intersectionRemoval', score: 7 },
             { id: 'xWing', score: 8 },
             { id: 'swordfish', score: 9 },
+            { id: 'xyWing', score: 10 },
+            { id: 'jellyfish', score: 11 },
         ];
         for (const technique of techniques) {
             const hint = findHint(board, 'professional', null, technique.id); // Check all techniques

@@ -507,92 +507,154 @@ const findIntersectionRemoval = (board, targetCell) => {
     return null;
 };
 
-const findXWing = (board, targetCell) => {
+const findFish = (board, targetCell, size, name) => {
+    const getCombinations = (array, size) => {
+        const result = [];
+        function combination(startIndex, currentCombination) {
+            if (currentCombination.length === size) {
+                result.push(currentCombination);
+                return;
+            }
+            for (let i = startIndex; i < array.length; i++) {
+                combination(i + 1, [...currentCombination, array[i]]);
+            }
+        }
+        combination(0, []);
+        return result;
+    }
     for (let num = 1; num <= 9; num++) {
-        // Row-based X-Wing
         const rowCandidates = [];
         for (let r = 0; r < 9; r++) {
             const cols = [];
             for (let c = 0; c < 9; c++) { if (getNotes(board, r, c).has(num)) { cols.push(c); } }
-            if (cols.length === 2) { rowCandidates.push({ row: r, cols: cols }); }
+            if (cols.length >= 2 && cols.length <= size) { rowCandidates.push({ row: r, cols }); }
         }
-
-        if (rowCandidates.length >= 2) {
-            for (let i = 0; i < rowCandidates.length; i++) {
-                for (let j = i + 1; j < rowCandidates.length; j++) {
-                    const r1 = rowCandidates[i], r2 = rowCandidates[j];
-                    if (r1.cols[0] === r2.cols[0] && r1.cols[1] === r2.cols[1]) {
-                        const c1 = r1.cols[0], c2 = r1.cols[1];
-                        const primaryCells = [ { row: r1.row, col: c1 }, { row: r1.row, col: c2 }, { row: r2.row, col: c1 }, { row: r2.row, col: c2 }];
-                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
-                        const eliminations = [];
-                        for (let r = 0; r < 9; r++) {
-                            if (r !== r1.row && r !== r2.row) {
-                                if (getNotes(board, r, c1).has(num)) eliminations.push({ row: r, col: c1, num });
-                                if (getNotes(board, r, c2).has(num)) eliminations.push({ row: r, col: c2, num });
-                            }
+        if (rowCandidates.length >= size) {
+            const rowCombinations = getCombinations(rowCandidates, size);
+            for (const combination of rowCombinations) {
+                const combinedCols = new Set(combination.flatMap(c => c.cols));
+                if (combinedCols.size === size) {
+                    const primaryCols = [...combinedCols].sort();
+                    const primaryRows = combination.map(c => c.row);
+                    const primaryCells = [];
+                    primaryRows.forEach(r => {
+                        primaryCols.forEach(c => {
+                            if (getNotes(board, r, c).has(num)) primaryCells.push({ row: r, col: c });
+                        });
+                    });
+                    if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                    const eliminations = [];
+                    for (let r = 0; r < 9; r++) {
+                        if (!primaryRows.includes(r)) {
+                            primaryCols.forEach(c => {
+                                if (getNotes(board, r, c).has(num)) eliminations.push({ row: r, col: c, num });
+                            });
                         }
-                        if (eliminations.length > 0) {
-                            const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
-                            return { type: 'X-Wing', primaryCells, secondaryCells, eliminations, solve: null };
+                    }
+                    if (eliminations.length > 0) {
+                        const secondaryCells = eliminations.map(e => ({ row: e.row, col: e.col }));
+                        return { type: name, primaryCells, secondaryCells, eliminations, solve: null };
+                    }
+                }
+            }
+        }
+        const colCandidates = [];
+        for (let c = 0; c < 9; c++) {
+            const rows = [];
+            for (let r = 0; r < 9; r++) { if (getNotes(board, r, c).has(num)) { rows.push(r); } }
+            if (rows.length >= 2 && rows.length <= size) { colCandidates.push({ col: c, rows }); }
+        }
+        if (colCandidates.length >= size) {
+            const colCombinations = getCombinations(colCandidates, size);
+            for (const combination of colCombinations) {
+                const combinedRows = new Set(combination.flatMap(c => c.rows));
+                if (combinedRows.size === size) {
+                    const primaryRows = [...combinedRows].sort();
+                    const primaryCols = combination.map(c => c.col);
+                    const primaryCells = [];
+                    primaryCols.forEach(c => {
+                        primaryRows.forEach(r => {
+                            if (getNotes(board, r, c).has(num)) primaryCells.push({ row: r, col: c });
+                        });
+                    });
+                    if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                    const eliminations = [];
+                    for (let c = 0; c < 9; c++) {
+                        if (!primaryCols.includes(c)) {
+                            primaryRows.forEach(r => {
+                                if (getNotes(board, r, c).has(num)) eliminations.push({ row: r, col: c, num });
+                            });
                         }
+                    }
+                    if (eliminations.length > 0) {
+                        const secondaryCells = eliminations.map(e => ({ row: e.row, col: e.col }));
+                        return { type: name, primaryCells, secondaryCells, eliminations, solve: null };
                     }
                 }
             }
         }
     }
     return null;
+}
+
+const findXWing = (board, targetCell) => findFish(board, targetCell, 2, 'X-Wing');
+const findSwordfish = (board, targetCell) => findFish(board, targetCell, 3, 'Swordfish');
+const findJellyfish = (board, targetCell) => findFish(board, targetCell, 4, 'Jellyfish');
+
+const cellsSeeEachOther = (cell1, cell2) => {
+    if (cell1.row === cell2.row || cell1.col === cell2.col) return true;
+    const box1 = Math.floor(cell1.row / 3) * 3 + Math.floor(cell1.col / 3);
+    const box2 = Math.floor(cell2.row / 3) * 3 + Math.floor(cell2.col / 3);
+    return box1 === box2;
 };
 
-const findSwordfish = (board, targetCell) => {
-    for (let num = 1; num <= 9; num++) {
-        // Row-based Swordfish
-        const rowCandidates = [];
-        for (let r = 0; r < 9; r++) {
-            const cols = [];
-            for (let c = 0; c < 9; c++) { if (getNotes(board, r, c).has(num)) { cols.push(c); } }
-            if (cols.length === 2 || cols.length === 3) { rowCandidates.push({ row: r, cols }); }
+const findXyWing = (board, targetCell) => {
+    const twoNoteCells = [];
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (getNotes(board, r, c).size === 2) {
+                twoNoteCells.push({ row: r, col: c, notes: [...getNotes(board, r, c)] });
+            }
         }
-
-        if (rowCandidates.length >= 3) {
-            for (let i = 0; i < rowCandidates.length; i++) {
-                for (let j = i + 1; j < rowCandidates.length; j++) {
-                    for (let k = j + 1; k < rowCandidates.length; k++) {
-                        const r1 = rowCandidates[i], r2 = rowCandidates[j], r3 = rowCandidates[k];
-                        const combinedCols = new Set([...r1.cols, ...r2.cols, ...r3.cols]);
-                        if (combinedCols.size === 3) {
-                            const [c1, c2, c3] = [...combinedCols].sort();
-                            const primaryRows = [r1.row, r2.row, r3.row];
-                            const primaryCells = [];
-                            primaryRows.forEach(r => {
-                                [c1, c2, c3].forEach(c => {
-                                    if(getNotes(board, r, c).has(num)) primaryCells.push({row: r, col: c});
-                                });
-                            });
-                            
-                            if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
-
-                            const eliminations = [];
-                            for (let r = 0; r < 9; r++) {
-                                if (!primaryRows.includes(r)) {
-                                    if (getNotes(board, r, c1).has(num)) eliminations.push({ row: r, col: c1, num });
-                                    if (getNotes(board, r, c2).has(num)) eliminations.push({ row: r, col: c2, num });
-                                    if (getNotes(board, r, c3).has(num)) eliminations.push({ row: r, col: c3, num });
+    }
+    if (twoNoteCells.length < 3) return null;
+    for (const pivot of twoNoteCells) {
+        const [x, y] = pivot.notes;
+        const pincers = twoNoteCells.filter(cell => cell !== pivot && cellsSeeEachOther(pivot, cell));
+        if (pincers.length < 2) continue;
+        const pincerA_candidates = pincers.filter(p => p.notes.includes(x) && !p.notes.includes(y));
+        const pincerB_candidates = pincers.filter(p => p.notes.includes(y) && !p.notes.includes(x));
+        for (const pincerA of pincerA_candidates) {
+            const z = pincerA.notes.find(n => n !== x);
+            if (!z) continue;
+            for (const pincerB of pincerB_candidates) {
+                if (!pincerB.notes.includes(z)) continue;
+                const primaryCells = [pivot, pincerA, pincerB];
+                if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                const eliminations = [];
+                const secondaryCells = [];
+                for (let r = 0; r < 9; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        const currentCell = { row: r, col: c };
+                        if (primaryCells.some(pc => pc.row === r && pc.col === c)) continue;
+                        if (cellsSeeEachOther(pincerA, currentCell) && cellsSeeEachOther(pincerB, currentCell)) {
+                            if (getNotes(board, r, c).has(z)) {
+                                eliminations.push({ row: r, col: c, num: z });
+                                if (!secondaryCells.some(sc => sc.row === r && sc.col === c)) {
+                                    secondaryCells.push({ row: r, col: c });
                                 }
                             }
-                            if (eliminations.length > 0) {
-                                const secondaryCells = eliminations.map(e => ({row: e.row, col: e.col}));
-                                return { type: 'Swordfish', primaryCells, secondaryCells, eliminations, solve: null };
-                            }
                         }
                     }
+                }
+                if (eliminations.length > 0) {
+                    return { type: 'XY-Wing', primaryCells, secondaryCells, eliminations, solve: null };
                 }
             }
         }
     }
     return null;
 };
-
 
 export const findHint = (board, difficulty, targetCell, technique = null) => {
     const findFunctions = {
@@ -605,6 +667,8 @@ export const findHint = (board, difficulty, targetCell, technique = null) => {
         intersectionRemoval: () => findIntersectionRemoval(board, targetCell),
         xWing: () => findXWing(board, targetCell),
         swordfish: () => findSwordfish(board, targetCell),
+        xyWing: () => findXyWing(board, targetCell),
+        jellyfish: () => findJellyfish(board, targetCell),
     };
     
     // If a specific technique is requested (i.e., for rating puzzles), find and return it directly.
@@ -617,7 +681,7 @@ export const findHint = (board, difficulty, targetCell, technique = null) => {
         easy: ['nakedSingle', 'hiddenSingle'],
         medium: ['nakedSingle', 'hiddenSingle'],
         hard: ['nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 'nakedTriple', 'hiddenTriple'],
-        professional: ['nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 'nakedTriple', 'hiddenTriple', 'intersectionRemoval', 'xWing', 'swordfish'],
+        professional: ['nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 'nakedTriple', 'hiddenTriple', 'intersectionRemoval', 'xWing', 'swordfish', 'xyWing', 'jellyfish'],
     };
 
     const techniquesToTry = techniquesByDifficulty[difficulty] || techniquesByDifficulty.professional;
