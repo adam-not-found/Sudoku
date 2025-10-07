@@ -39,7 +39,8 @@ export default function App() {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [movesCount, setMovesCount] = useState(0);
   const [mistakesCount, setMistakesCount] = useState(0);
-  const [isTimerVisible, setIsTimerVisible] = useState(() => localStorage.getItem('sudoku-timer-visible') !== 'false');
+  const [isTimerVisible, setIsTimerVisible] = useState(() => localStorage.getItem('sudoku-timer-visible') === 'true');
+  const [highlightedNumPad, setHighlightedNumPad] = useState(null);
 
   const isUIBlocked = isSettingsOpen || isStatsOpen;
 
@@ -90,12 +91,15 @@ export default function App() {
         
         setBoard(newBoard);
         setSelectedCell(null);
+        setHighlightedNumPad(null);
         setIsNotesMode(false);
         setHistory([]);
         setRedoHistory([]);
         setIsGameWon(false);
         setAnimationState('idle');
         setActiveHint(null);
+        setHintEffect(null);
+        setHintButtonEffect(null);
         setIsHintOnCooldown(false);
         if (cooldownIntervalRef.current) clearTimeout(cooldownIntervalRef.current);
         setHintUsageCount(0);
@@ -149,6 +153,14 @@ export default function App() {
     }
   }, [board, isNotesMode, selectedCell, isGameWon, solution, placeNumberOnBoard]);
   
+  const handleNumPadAction = (num) => {
+    if (selectedCell) {
+      handleNumberClick(num);
+    } else if (isNotesMode) {
+      setHighlightedNumPad(prev => prev === num ? null : num);
+    }
+  };
+
   const handleDelete = useCallback(() => {
     if (!selectedCell || isGameWon) return;
     const { row, col } = selectedCell;
@@ -268,6 +280,12 @@ export default function App() {
   }, [isUIBlocked, isGameWon]);
   
   useEffect(() => {
+    if (selectedCell) {
+        setHighlightedNumPad(null);
+    }
+  }, [selectedCell]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (isGameWon || isUIBlocked) return;
       if (!selectedCell && e.key.startsWith('Arrow')) { setSelectedCell({ row: 0, col: 0 }); e.preventDefault(); return; }
@@ -291,29 +309,36 @@ export default function App() {
     return <div className="flex items-center justify-center min-h-screen text-lg">Generating Puzzle...</div>;
   }
   
-  const highlightedNum = selectedCell && board[selectedCell.row][selectedCell.col].value > 0 ? board[selectedCell.row][selectedCell.col].value : null;
-  const hintDisplay = <div className="relative w-full h-6 mb-2"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>{activeHint.type}</div>}</div></div>;
-  const timerDisplay = <div className="relative w-full h-6 mb-3 flex items-center justify-center">{!isGameWon && <div className={`px-3 py-1 rounded-full text-lg font-semibold transition-colors ${isDarkMode ? 'bg-slate-700/80 text-slate-300' : 'bg-slate-200/80 text-slate-600'}`}>{formatTime(elapsedTime)}</div>}</div>;
+  const highlightedNumFromCell = selectedCell && board[selectedCell.row][selectedCell.col].value > 0 ? board[selectedCell.row][selectedCell.col].value : null;
+  const highlightedNum = highlightedNumFromCell ?? highlightedNumPad;
+  const hintDisplay = <div className="relative w-full h-6 mb-3"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>{activeHint.type}</div>}</div></div>;
 
   return (
-    <div className="min-h-screen font-sans relative" onClick={() => setSelectedCell(null)}>
+    <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); }}>
       <Header isDarkMode={isDarkMode} onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onNewGame={() => startNewGame(difficulty)} />
-      <div className={`min-h-screen flex flex-col items-center justify-center pt-24 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
+      <div className={`min-h-screen flex flex-col items-center justify-center pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
         <main className={`w-full max-w-lg flex flex-col items-center gap-1 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''}`}>
-            {isTimerVisible ? timerDisplay : hintDisplay}
+            {hintDisplay}
             <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
               {animationState !== 'idle' && <VictoryScreen message={victoryMessage} moves={movesCount} time={formatTime(elapsedTime)} mistakes={mistakesCount} />}
               <SudokuBoard board={board} solution={solution} selectedCell={selectedCell} onCellClick={(r, c) => { if (isGameWon) return; if (activeHint) setActiveHint(null); setSelectedCell(p => p?.row === r && p?.col === c ? null : {row: r, col: c})}} isNotesMode={isNotesMode} isDarkMode={isDarkMode} forceDarkMode={isGameWon} isAutoNotesEnabled={isAutoNotesEnabled} isHighlightNotesEnabled={isHighlightNotesEnabled} highlightedNumber={highlightedNum} activeHint={activeHint} hintEffect={hintEffect} />
             </div>
-            {isTimerVisible ? hintDisplay : <div className="w-full h-2" />}
+            <div className="w-full h-2" />
             <div className="relative w-full flex flex-col items-center gap-0">
               <div className={`w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`}>
-                <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}><NumberPad onNumberClick={handleNumberClick} isNotesMode={isNotesMode} isDarkMode={isDarkMode} /></div>
+                <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}><NumberPad onNumberClick={handleNumPadAction} isNotesMode={isNotesMode} isDarkMode={isDarkMode} highlightedNumber={highlightedNumPad} /></div>
               </div>
               <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
                 <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`}>
                   <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? '-translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}>
-                    <Controls isNotesMode={isNotesMode} onToggleNotesMode={() => setIsNotesMode(p => !p)} onUndo={() => {if(history.length>0){setRedoHistory(p=>[...p,board]); setBoard(history[history.length-1]); setHistory(history.slice(0,-1)); setActiveHint(null);}}} canUndo={history.length>0} onRedo={() => {if(redoHistory.length>0){setHistory(p=>[...p,board]); setBoard(redoHistory[redoHistory.length-1]); setRedoHistory(redoHistory.slice(0,-1)); setActiveHint(null);}}} canRedo={redoHistory.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown} cooldownDuration={4} onDelete={handleDelete} isDarkMode={isDarkMode} hintButtonEffect={hintButtonEffect} />
+                    <div className="flex items-center gap-4">
+                        <Controls isNotesMode={isNotesMode} onToggleNotesMode={() => setIsNotesMode(p => !p)} onUndo={() => {if(history.length>0){setRedoHistory(p=>[...p,board]); setBoard(history[history.length-1]); setHistory(history.slice(0,-1)); setActiveHint(null);}}} canUndo={history.length>0} onRedo={() => {if(redoHistory.length>0){setHistory(p=>[...p,board]); setBoard(redoHistory[redoHistory.length-1]); setRedoHistory(redoHistory.slice(0,-1)); setActiveHint(null);}}} canRedo={redoHistory.length > 0} onHint={handleHint} isHintOnCooldown={isHintOnCooldown} cooldownDuration={4} onDelete={handleDelete} isDarkMode={isDarkMode} hintButtonEffect={hintButtonEffect} />
+                        {isTimerVisible && !isGameWon && (
+                            <div className={`h-12 flex items-center justify-center px-4 rounded-full text-lg font-semibold tabular-nums tracking-wider transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
+                                {formatTime(elapsedTime)}
+                            </div>
+                        )}
+                    </div>
                   </div>
                 </div>
                 <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}} onClick={(e) => e.stopPropagation()}>

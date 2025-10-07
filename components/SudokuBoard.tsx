@@ -25,16 +25,20 @@ export default function SudokuBoard({ board, solution, selectedCell, onCellClick
               }
               
               return (
-                <Cell
-                  key={`${rowIndex}-${colIndex}`}
-                  data={cellData} isSelected={isSelected} isPeer={isPeer && !isSelected}
-                  isHighlighted={isHighlighted} isCorrect={!cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex]}
-                  onClick={() => onCellClick(rowIndex, colIndex)} isDarkMode={isDark} isNotesMode={isNotesMode}
-                  isAutoNotesEnabled={isAutoNotesEnabled} highlightedNumber={highlightedNumber}
-                  isHintPrimary={!!activeHint?.primaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
-                  isHintSecondary={!!activeHint?.secondaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
-                  hintEffect={hintEffect} rowIndex={rowIndex} colIndex={colIndex}
-                />
+                // FIX: Moved the `key` prop to a `React.Fragment` wrapper. The `Cell` component's
+                // inferred type did not include the special `key` prop, causing a TypeScript error.
+                // Using a fragment provides a valid target for the key without adding a DOM element.
+                <React.Fragment key={`${rowIndex}-${colIndex}`}>
+                  <Cell
+                    data={cellData} isSelected={isSelected} isPeer={isPeer && !isSelected}
+                    isHighlighted={isHighlighted} isCorrect={!cellData.isInitial && cellData.value !== 0 && cellData.value === solution[rowIndex][colIndex]}
+                    onClick={() => onCellClick(rowIndex, colIndex)} isDarkMode={isDark} isNotesMode={isNotesMode}
+                    isAutoNotesEnabled={isAutoNotesEnabled} highlightedNumber={highlightedNumber}
+                    isHintPrimary={!!activeHint?.primaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
+                    isHintSecondary={!!activeHint?.secondaryCells.some(c => c.row === rowIndex && c.col === colIndex)}
+                    hintEffect={hintEffect} rowIndex={rowIndex} colIndex={colIndex}
+                  />
+                </React.Fragment>
               );
             })}
           </div>

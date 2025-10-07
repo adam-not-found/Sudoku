@@ -80,12 +80,11 @@ export default function Cell({ data, isSelected, isPeer, isHighlighted, isCorrec
               fontWeightClass = 'font-bold';
             } else {
               if (isDarkMode && (isHintPrimary || isHintSecondary)) noteClass = 'text-slate-100';
-              else if (isAutoNotesEnabled) noteClass = isUserNote ? (isDarkMode ? 'text-sky-300' : 'text-sky-500') : (isDarkMode ? 'text-slate-300' : 'text-slate-400');
-              else noteClass = isDarkMode ? 'text-slate-200' : 'text-slate-500';
+              else if (isAutoNotesEnabled) noteClass = isUserNote ? (isDarkMode ? 'text-sky-300' : 'text-sky-500') : 'text-slate-400';
+              else noteClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
 
               if (isNotesMode) {
                 fontWeightClass = 'font-bold';
-                if (isAutoNotesEnabled && isUserNote) textShadowClass = 'text-shadow-blue-glow';
               } else if (isUserNote || !isAutoNotesEnabled) fontWeightClass = 'font-medium';
             }
             
