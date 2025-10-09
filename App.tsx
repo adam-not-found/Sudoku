@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { generateSudoku } from './services/sudokuGenerator';
 import { calculateCandidates, findHint } from './services/hintService';
@@ -8,6 +9,7 @@ import Header from './components/Header';
 import VictoryScreen from './components/VictoryScreen';
 import SettingsPanel from './components/SettingsPanel';
 import StatsPanel from './components/StatsPanel';
+import { themes } from './components/themes';
 
 export default function App() {
   const [board, setBoard] = useState([]);
@@ -24,10 +26,12 @@ export default function App() {
   const [difficulty, setDifficulty] = useState(() => localStorage.getItem('sudoku-difficulty') || 'medium');
   const [isAutoNotesEnabled, setIsAutoNotesEnabled] = useState(() => localStorage.getItem('sudoku-auto-notes') === 'true');
   const [isHighlightNotesEnabled, setIsHighlightNotesEnabled] = useState(() => localStorage.getItem('sudoku-highlight-notes') === 'true');
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('sudoku-dark-mode');
-    return saved ? saved === 'true' : window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
-  });
+  
+  // Theming state
+  const [theme, setTheme] = useState(() => localStorage.getItem('sudoku-theme') || 'default');
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem('sudoku-color-mode') || 'system'); // 'light', 'dark', 'system'
+  const [isDarkMode, setIsDarkMode] = useState(false); // This is now derived from colorMode
+
   const [stats, setStats] = useState(() => { try { return JSON.parse(localStorage.getItem('sudoku-stats')) || {gamesPlayed:0,gamesWon:0,totalMoves:0,totalMistakes:0,byDifficulty:{easy:{wins:0,bestTime:null,totalTime:0},medium:{wins:0,bestTime:null,totalTime:0},hard:{wins:0,bestTime:null,totalTime:0},professional:{wins:0,bestTime:null,totalTime:0}}}; } catch (e) { return {gamesPlayed:0,gamesWon:0,totalMoves:0,totalMistakes:0,byDifficulty:{easy:{wins:0,bestTime:null,totalTime:0},medium:{wins:0,bestTime:null,totalTime:0},hard:{wins:0,bestTime:null,totalTime:0},professional:{wins:0,bestTime:null,totalTime:0}}}; }});
   const [activeHint, setActiveHint] = useState(null);
   const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
@@ -233,10 +237,44 @@ export default function App() {
         setShowNewGameConfirm(p => !p);
     }
   }, [isGameWon]);
+  
+  // Update isDarkMode based on colorMode
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const updateMode = () => {
+      if (colorMode === 'system') setIsDarkMode(mediaQuery.matches);
+      else setIsDarkMode(colorMode === 'dark');
+    };
+    updateMode();
+    mediaQuery.addEventListener('change', updateMode);
+    return () => mediaQuery.removeEventListener('change', updateMode);
+  }, [colorMode]);
 
+  // Apply theme and save settings
+  useEffect(() => {
+    const themeData = themes[theme]?.[isDarkMode ? 'dark' : 'light'] || themes.default[isDarkMode ? 'dark' : 'light'];
+    for (const [key, value] of Object.entries(themeData)) {
+      // FIX: The value from Object.entries can be inferred as 'unknown' in some TypeScript
+      // configurations, causing a type error with `setProperty`. Explicitly converting
+      // the value to a string ensures type safety.
+      document.documentElement.style.setProperty(key, String(value));
+    }
+    localStorage.setItem('sudoku-theme', theme);
+    localStorage.setItem('sudoku-color-mode', colorMode);
+    localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
+    localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
+    localStorage.setItem('sudoku-timer-visible', String(isTimerVisible));
+    localStorage.setItem('sudoku-stats', JSON.stringify(stats));
+  }, [theme, isDarkMode, colorMode, isAutoNotesEnabled, isHighlightNotesEnabled, isTimerVisible, stats]);
+  
   useEffect(() => {
     const serialize = (k, v) => v instanceof Set ? { __dataType: 'Set', value: [...v] } : v;
-    const deserialize = (k, v) => v?.__dataType === 'Set' ? new Set(v.value) : v;
+    // FIX: The error is caused by an unsafe reviver function in `JSON.parse`.
+    // The `v.value` is not guaranteed to be iterable for `new Set()`. This fix
+    // ensures `v` is a properly structured object and `v.value` is an array before 
+    // constructing a Set, preventing a potential runtime error that a strict 
+    // linter may flag as a type issue.
+    const deserialize = (k, v) => (v && typeof v === 'object' && v.__dataType === 'Set' && Array.isArray(v.value)) ? new Set(v.value) : v;
 
     const saved = localStorage.getItem('sudoku-saved-game');
     if (saved) {
@@ -260,17 +298,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.body.classList.toggle('dark', isDarkMode);
-    localStorage.setItem('sudoku-dark-mode', String(isDarkMode));
-    localStorage.setItem('sudoku-auto-notes', String(isAutoNotesEnabled));
-    localStorage.setItem('sudoku-highlight-notes', String(isHighlightNotesEnabled));
-    localStorage.setItem('sudoku-timer-visible', String(isTimerVisible));
-    localStorage.setItem('sudoku-stats', JSON.stringify(stats));
     if (board.length > 0 && !isGameWon) {
       const serialize = (k, v) => v instanceof Set ? { __dataType: 'Set', value: [...v] } : v;
       localStorage.setItem('sudoku-saved-game', JSON.stringify({ board, solution, history, redoHistory, elapsedTime, movesCount, mistakesCount, difficulty, hintUsageCount }, serialize));
     }
-  });
+  }, [board, solution, history, redoHistory, elapsedTime, movesCount, mistakesCount, difficulty, hintUsageCount, isGameWon]);
 
   useEffect(() => { if (isGameWon) setAnimationState('playing'); }, [isGameWon]);
   
@@ -315,16 +347,16 @@ export default function App() {
   }, [selectedCell, handleDelete, handleNumberClick, isGameWon, isUIBlocked]);
 
   if (board.length === 0 || solution.length === 0) {
-    return <div className="flex items-center justify-center min-h-screen text-lg">Generating Puzzle...</div>;
+    return <div className="flex items-center justify-center min-h-screen text-lg text-[var(--color-text-primary)]">Generating Puzzle...</div>;
   }
   
   const highlightedNumFromCell = selectedCell && board[selectedCell.row][selectedCell.col].value > 0 ? board[selectedCell.row][selectedCell.col].value : null;
   const highlightedNum = highlightedNumFromCell ?? highlightedNumPad;
-  const hintDisplay = <div className="relative w-full h-6 mb-2"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md ${isDarkMode ? 'bg-slate-700 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>{activeHint.type}</div>}</div></div>;
+  const hintDisplay = <div className="relative w-full h-6 mb-2"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md bg-[var(--color-ui-bg-secondary)] text-[var(--color-hint-text)]`}>{activeHint.type}</div>}</div></div>;
 
   return (
     <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); setShowNewGameConfirm(false); }}>
-      <Header isDarkMode={isDarkMode} onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onTitleClick={handleToggleNewGameConfirm} isNewGameConfirmOpen={showNewGameConfirm} />
+      <Header onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onTitleClick={handleToggleNewGameConfirm} isNewGameConfirmOpen={showNewGameConfirm} />
       <div className={`min-h-screen flex flex-col items-center justify-start md:justify-center pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
         <main className={`w-full max-w-lg flex flex-col items-center gap-2 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''} mt-8 md:mt-0`}>
             {hintDisplay}
@@ -334,17 +366,17 @@ export default function App() {
             </div>
             <div className="relative w-full flex flex-col items-center gap-0 mt-4">
               <div className={`w-full transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-0 pointer-events-none' : ''}`}>
-                <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}><NumberPad onNumberClick={handleNumPadAction} isNotesMode={isNotesMode} isDarkMode={isDarkMode} highlightedNumber={highlightedNumPad} /></div>
+                <div className={`transition-transform duration-500 ease-in-out ${isGameWon ? 'translate-y-8' : ''}`} onClick={(e) => e.stopPropagation()}><NumberPad onNumberClick={handleNumPadAction} isNotesMode={isNotesMode} highlightedNumber={highlightedNumPad} /></div>
               </div>
               <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
 
                 <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}} onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => startNewGame(difficulty)} className="bg-slate-800 text-white font-bold py-4 px-16 rounded-full text-2xl hover:bg-slate-700/80 transition-colors transform active:scale-95 shadow-lg"><span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>Play Again</span></button>
+                  <button onClick={() => startNewGame(difficulty)} className="bg-[var(--color-controls-bg)] text-[var(--color-controls-text)] font-bold py-4 px-16 rounded-full text-2xl hover:bg-[var(--color-controls-bg-hover)] transition-colors transform active:scale-95 shadow-lg"><span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>Play Again</span></button>
                 </div>
                 
                 <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                        <div className={`relative rounded-full p-2 shadow-lg transition-colors duration-300 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-800'}`}>
+                        <div className={`relative rounded-full p-2 shadow-lg transition-colors duration-300 bg-[var(--color-controls-bg)]`}>
                             {/* Controls Icons */}
                             <div className={`transition-all duration-200 ease-out ${showNewGameConfirm ? 'opacity-0 blur-sm scale-90' : 'opacity-100 blur-0 scale-100'}`}>
                                 <Controls
@@ -358,7 +390,6 @@ export default function App() {
                                     isHintOnCooldown={isHintOnCooldown}
                                     cooldownDuration={4}
                                     onDelete={handleDelete}
-                                    isDarkMode={isDarkMode}
                                     hintButtonEffect={hintButtonEffect}
                                 />
                             </div>
@@ -366,7 +397,7 @@ export default function App() {
                             <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ease-in ${showNewGameConfirm ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} style={{transitionDelay: showNewGameConfirm ? '200ms' : '0ms'}}>
                                 <button
                                     onClick={() => { startNewGame(difficulty); setShowNewGameConfirm(false); }}
-                                    className="w-full h-full text-white font-bold text-2xl"
+                                    className="w-full h-full text-[var(--color-controls-text)] font-bold text-2xl"
                                 >
                                     New Game
                                 </button>
@@ -374,7 +405,7 @@ export default function App() {
                         </div>
 
                         {isTimerVisible && !isGameWon && (
-                            <div className={`h-12 flex items-center justify-center px-4 rounded-full text-lg font-semibold tabular-nums tracking-wider transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
+                            <div className={`h-12 flex items-center justify-center px-4 rounded-full text-lg font-semibold tabular-nums tracking-wider transition-colors bg-[var(--color-timer-bg)] text-[var(--color-timer-text)]`}>
                                 {formatTime(elapsedTime)}
                             </div>
                         )}
@@ -385,8 +416,15 @@ export default function App() {
             </div>
         </main>
       </div>
-      <SettingsPanel isOpen={isSettingsOpen} onClose={handleCloseSettings} currentDifficulty={difficulty} isDarkMode={isDarkMode} onToggleDarkMode={(dark) => setIsDarkMode(dark)} onFillBoard={() => { setIsSettingsOpen(false); setTimeout(() => { const solved = solution.map(r => r.map(v => ({value: v, isInitial: false, isWrong: false, userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set()}))); setBoard(solved); triggerWinState(); }, 300); }} isAutoNotesEnabled={isAutoNotesEnabled} onSetAutoNotes={handleSetAutoNotes} isHighlightNotesEnabled={isHighlightNotesEnabled} onSetHighlightNotes={setIsHighlightNotesEnabled} isTimerVisible={isTimerVisible} onSetIsTimerVisible={setIsTimerVisible} />
-      <StatsPanel isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} stats={stats} isDarkMode={isDarkMode} />
+      <SettingsPanel isOpen={isSettingsOpen} onClose={handleCloseSettings} 
+        currentDifficulty={difficulty} 
+        theme={theme} setTheme={setTheme} colorMode={colorMode} setColorMode={setColorMode}
+        onFillBoard={() => { setIsSettingsOpen(false); setTimeout(() => { const solved = solution.map(r => r.map(v => ({value: v, isInitial: false, isWrong: false, userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set()}))); setBoard(solved); triggerWinState(); }, 300); }} 
+        isAutoNotesEnabled={isAutoNotesEnabled} onSetAutoNotes={handleSetAutoNotes} 
+        isHighlightNotesEnabled={isHighlightNotesEnabled} onSetHighlightNotes={setIsHighlightNotesEnabled} 
+        isTimerVisible={isTimerVisible} onSetIsTimerVisible={setIsTimerVisible} 
+      />
+      <StatsPanel isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} stats={stats} />
     </div>
   );
 }

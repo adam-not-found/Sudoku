@@ -72,3 +72,43 @@ export function StatsIcon() {
       </svg>
   );
 }
+
+const themePatterns = {
+  default: [
+    "M 0,25 C 40,5 60,45 100,25 L 100,50 C 60,70 40,30 0,50 Z",
+    "M 0,65 C 40,45 60,85 100,65 L 100,90 C 60,110 40,70 0,90 Z",
+    "M 25,0 C 5,40 45,60 25,100 L 50,100 C 70,60 30,40 50,0 Z"
+  ],
+  minguo: [
+    "M 50,50 C 110,0 110,100 50,50 C -10,100 -10,0 50,50 Z",
+    "M 50,50 C -10,50 50,-10 50,-10 C 50,-10 110,50 50,50 Z",
+    "M 50,50 C -10,50 50,110 50,110 C 50,110 110,50 50,50 Z"
+  ],
+  forest: [
+    "M -10,80 C 40,110 80,-20 110,20 L 110,0 C 70,30 30,90 -10,60 Z",
+    "M -10,90 C 20,40 60,120 110,70 L 110,50 C 70,110 30,30 -10,70 Z",
+    "M -10,110 C 40,80 80,120 110,90 L 110,110 L -10,110 Z"
+  ],
+  luxury: [
+    "M 0,0 C 100,0 0,100 100,100 L 100,80 C 20,100 100,20 0,0 Z",
+    "M 100,0 C 0,0 100,100 0,100 L 20,100 C 100,80 0,20 100,0 Z",
+    "M 50,0 C 0,50 100,50 50,100 L 50,80 C 80,50 20,50 50,20 Z"
+  ],
+  retro: [
+    "M -10,50 C 20,20 80,20 110,50 L 110,80 C 80,-10 20,-10 -10,80 Z",
+    "M -10,90 C 20,60 80,60 110,90 L 110,120 C 80,30 20,30 -10,120 Z",
+    "M -10,10 C 20,-20 80,-20 110,10 L 110,40 C 80,-50 20,-50 -10,40 Z"
+  ]
+};
+
+export function ThemeIcon({ colors, patternId }) {
+  const [p1, p2, p3] = themePatterns[patternId] || themePatterns.default;
+  return (
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="none">
+      <path d="M 0 0 H 100 V 100 H 0 Z" fill={colors[0]} />
+      <path d={p1} fill={colors[1]} />
+      <path d={p2} fill={colors[2]} />
+      <path d={p3} fill={colors[3]} />
+    </svg>
+  );
+}

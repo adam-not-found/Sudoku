@@ -23,13 +23,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        /* Default Theme - Light */
+        --color-page-bg: #eef1f5;
+        --color-text-primary: #111827;
+        --color-text-secondary: #4b5563;
+        --color-accent: #2563eb;
+        --color-accent-text: #ffffff;
+        --color-accent-hover: #1d4ed8;
+      }
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #eef1f5;
+        background-color: var(--color-page-bg);
         transition: background-color 0.5s ease-in-out;
-      }
-      body.dark {
-        background-color: #0f172a; /* slate-900 */
       }
       
       @keyframes shake {
