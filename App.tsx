@@ -325,8 +325,8 @@ export default function App() {
   return (
     <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); setShowNewGameConfirm(false); }}>
       <Header isDarkMode={isDarkMode} onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onTitleClick={handleToggleNewGameConfirm} isNewGameConfirmOpen={showNewGameConfirm} />
-      <div className={`min-h-screen flex flex-col items-center justify-start pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
-        <main className={`w-full max-w-lg flex flex-col items-center gap-2 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''} mt-8`}>
+      <div className={`min-h-screen flex flex-col items-center justify-start md:justify-center pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
+        <main className={`w-full max-w-lg flex flex-col items-center gap-2 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''} mt-8 md:mt-0`}>
             {hintDisplay}
             <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
               {animationState !== 'idle' && <VictoryScreen message={victoryMessage} moves={movesCount} time={formatTime(elapsedTime)} mistakes={mistakesCount} hints={hintUsageCount} />}
