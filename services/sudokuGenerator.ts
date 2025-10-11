@@ -74,14 +74,14 @@ const REMOVAL_COUNT = {
   easy: 40,
   medium: 48,
   hard: 54,
-  professional: 58,
+  professional: 62, // Increased to generate harder base puzzles
 };
 
 const DIFFICULTY_SCORES = {
-  easy: { min: 1, max: 2 },
-  medium: { min: 3, max: 4 },
-  hard: { min: 5, max: 7 },
-  professional: { min: 8, max: 99 },
+  easy: { min: 45, max: 60 },
+  medium: { min: 61, max: 120 },
+  hard: { min: 121, max: 499 },
+  professional: { min: 500, max: 9998, minEliteMoves: 4 },
 };
 
 const ratePuzzleDifficulty = (puzzle) => {
@@ -93,30 +93,56 @@ const ratePuzzleDifficulty = (puzzle) => {
         eliminatedNotes: new Set(),
       }))
     );
-    let maxScore = 0;
+    
+    const techniqueScores = {
+        nakedSingle: 1,
+        hiddenSingle: 2,
+        nakedPair: 5,
+        hiddenPair: 8,
+        nakedTriple: 10,
+        hiddenTriple: 12,
+        intersectionRemoval: 15,
+        xWing: 100,
+        skyscraper: 110,
+        twoStringKite: 120,
+        xyWing: 150,
+        xyzWing: 180,
+        swordfish: 200,
+        jellyfish: 250,
+        uniqueRectangle: 250,
+    };
+    
+    const eliteTechniques = new Set([
+      'xWing', 'skyscraper', 'twoStringKite', 'xyWing', 'xyzWing', 'swordfish', 'jellyfish', 'uniqueRectangle'
+    ]);
+    
+    const orderedTechniques = [
+        'nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 
+        'nakedTriple', 'hiddenTriple', 'intersectionRemoval', 'xWing', 
+        'skyscraper', 'twoStringKite', 'xyWing', 'xyzWing', 'swordfish', 
+        'jellyfish', 'uniqueRectangle'
+    ];
+
+    let totalScore = 0;
+    let eliteMovesCount = 0;
     let stuck = false;
+
     while (!stuck) {
         let moveMade = false;
-        const techniques = [
-            { id: 'nakedSingle', score: 1 },
-            { id: 'hiddenSingle', score: 2 },
-            { id: 'nakedPair', score: 3 },
-            { id: 'hiddenPair', score: 4 },
-            { id: 'nakedTriple', score: 5 },
-            { id: 'hiddenTriple', score: 6 },
-            { id: 'intersectionRemoval', score: 7 },
-            { id: 'xWing', score: 8 },
-            { id: 'swordfish', score: 9 },
-            { id: 'xyWing', score: 10 },
-            { id: 'jellyfish', score: 11 },
-        ];
-        for (const technique of techniques) {
-            const hint = findHint(board, 'professional', null, technique.id); // Check all techniques
+        
+        for (const techniqueId of orderedTechniques) {
+            const hint = findHint(board, 'professional', null, techniqueId);
             if (hint) {
-                maxScore = Math.max(maxScore, technique.score);
+                totalScore += techniqueScores[techniqueId] || 0;
+                if (eliteTechniques.has(techniqueId)) {
+                    eliteMovesCount++;
+                }
+
                 if (hint.solve) {
                     const { row, col, num } = hint.solve;
                     board[row][col].value = num;
+                    board[row][col].userNotes.clear();
+                    board[row][col].autoNotes.clear();
                     board[row][col].eliminatedNotes.clear();
                 } else if (hint.eliminations.length > 0) {
                     hint.eliminations.forEach(({ row, col, num }) => {
@@ -127,12 +153,14 @@ const ratePuzzleDifficulty = (puzzle) => {
                 break;
             }
         }
+        
         if (!moveMade) {
             stuck = true;
         }
     }
+    
     const isSolved = board.every(row => row.every(cell => cell.value !== 0));
-    return isSolved ? maxScore : 999; // Use a large number for unsolvable puzzles
+    return isSolved ? { score: totalScore, eliteMoves: eliteMovesCount } : { score: 9999, eliteMoves: 0 };
 };
 
 export const generateSudoku = (difficulty = 'medium') => {
@@ -162,8 +190,13 @@ export const generateSudoku = (difficulty = 'medium') => {
         removedCount++;
       }
     }
-    const puzzleScore = ratePuzzleDifficulty(candidatePuzzle);
-    if (puzzleScore >= targetDifficulty.min && puzzleScore <= targetDifficulty.max) {
+    const { score: puzzleScore, eliteMoves: puzzleEliteMoves } = ratePuzzleDifficulty(candidatePuzzle);
+
+    if (
+      puzzleScore >= targetDifficulty.min && 
+      puzzleScore <= targetDifficulty.max &&
+      (!targetDifficulty.minEliteMoves || puzzleEliteMoves >= targetDifficulty.minEliteMoves)
+    ) {
       puzzle = candidatePuzzle;
     }
     // If puzzle is not set, the loop continues.

@@ -656,6 +656,223 @@ const findXyWing = (board, targetCell) => {
     return null;
 };
 
+const findSkyscraper = (board, targetCell) => {
+    for (let num = 1; num <= 9; num++) {
+        // Row-based Skyscraper
+        const rowCandidates = [];
+        for (let r = 0; r < 9; r++) {
+            const cellsInRow = [];
+            for (let c = 0; c < 9; c++) { if (getNotes(board, r, c).has(num)) cellsInRow.push({ row: r, col: c }); }
+            if (cellsInRow.length === 2) rowCandidates.push(cellsInRow);
+        }
+
+        if (rowCandidates.length >= 2) {
+            for (let i = 0; i < rowCandidates.length; i++) {
+                for (let j = i + 1; j < rowCandidates.length; j++) {
+                    const r1_cells = rowCandidates[i], r2_cells = rowCandidates[j];
+                    const [c1, c2] = [r1_cells[0].col, r1_cells[1].col], [c3, c4] = [r2_cells[0].col, r2_cells[1].col];
+                    
+                    let roof1, roof2;
+                    if (c1 === c3 && c2 !== c4) { roof1 = { row: r1_cells[0].row, col: c2 }; roof2 = { row: r2_cells[0].row, col: c4 }; } 
+                    else if (c1 === c4 && c2 !== c3) { roof1 = { row: r1_cells[0].row, col: c2 }; roof2 = { row: r2_cells[0].row, col: c3 }; } 
+                    else if (c2 === c3 && c1 !== c4) { roof1 = { row: r1_cells[0].row, col: c1 }; roof2 = { row: r2_cells[0].row, col: c4 }; } 
+                    else if (c2 === c4 && c1 !== c3) { roof1 = { row: r1_cells[0].row, col: c1 }; roof2 = { row: r2_cells[0].row, col: c3 }; } 
+                    else continue;
+
+                    const primaryCells = [...r1_cells, ...r2_cells];
+                    const eliminations = [], secondaryCells = [];
+                    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+                        if (primaryCells.some(pc => pc.row === r && pc.col === c)) continue;
+                        const currentCell = { row: r, col: c };
+                        if (cellsSeeEachOther(currentCell, roof1) && cellsSeeEachOther(currentCell, roof2) && getNotes(board, r, c).has(num)) {
+                            eliminations.push({ row: r, col: c, num });
+                            if (!secondaryCells.some(sc => sc.row === r && sc.col === c)) secondaryCells.push({ row: r, col: c });
+                        }
+                    }
+                    if (eliminations.length > 0) {
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        return { type: 'Skyscraper', primaryCells, secondaryCells, eliminations, solve: null };
+                    }
+                }
+            }
+        }
+        
+        // Column-based Skyscraper
+        const colCandidates = [];
+        for (let c = 0; c < 9; c++) {
+            const cellsInCol = [];
+            for (let r = 0; r < 9; r++) { if (getNotes(board, r, c).has(num)) cellsInCol.push({ row: r, col: c }); }
+            if (cellsInCol.length === 2) colCandidates.push(cellsInCol);
+        }
+        
+        if (colCandidates.length >= 2) {
+            for (let i = 0; i < colCandidates.length; i++) {
+                for (let j = i + 1; j < colCandidates.length; j++) {
+                    const c1_cells = colCandidates[i], c2_cells = colCandidates[j];
+                    const [r1, r2] = [c1_cells[0].row, c1_cells[1].row], [r3, r4] = [c2_cells[0].row, c2_cells[1].row];
+                    
+                    let roof1, roof2;
+                    if (r1 === r3 && r2 !== r4) { roof1 = { row: r2, col: c1_cells[0].col }; roof2 = { row: r4, col: c2_cells[0].col }; }
+                    else if (r1 === r4 && r2 !== r3) { roof1 = { row: r2, col: c1_cells[0].col }; roof2 = { row: r3, col: c2_cells[0].col }; }
+                    else if (r2 === r3 && r1 !== r4) { roof1 = { row: r1, col: c1_cells[0].col }; roof2 = { row: r4, col: c2_cells[0].col }; }
+                    else if (r2 === r4 && r1 !== r3) { roof1 = { row: r1, col: c1_cells[0].col }; roof2 = { row: r3, col: c2_cells[0].col }; }
+                    else continue;
+
+                    const primaryCells = [...c1_cells, ...c2_cells];
+                    const eliminations = [], secondaryCells = [];
+                    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+                        if (primaryCells.some(pc => pc.row === r && pc.col === c)) continue;
+                        const currentCell = { row: r, col: c };
+                        if (cellsSeeEachOther(currentCell, roof1) && cellsSeeEachOther(currentCell, roof2) && getNotes(board, r, c).has(num)) {
+                            eliminations.push({ row: r, col: c, num });
+                            if (!secondaryCells.some(sc => sc.row === r && sc.col === c)) secondaryCells.push({ row: r, col: c });
+                        }
+                    }
+                    if (eliminations.length > 0) {
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        return { type: 'Skyscraper', primaryCells, secondaryCells, eliminations, solve: null };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findTwoStringKite = (board, targetCell) => {
+    for (let num = 1; num <= 9; num++) {
+        // Find all rows and columns with exactly two candidates for the current number
+        const rowsWithTwo = [];
+        for (let r = 0; r < 9; r++) {
+            const cols = [];
+            for (let c = 0; c < 9; c++) { if (getNotes(board, r, c).has(num)) cols.push(c); }
+            if (cols.length === 2) rowsWithTwo.push({ r, cols });
+        }
+        const colsWithTwo = [];
+        for (let c = 0; c < 9; c++) {
+            const rows = [];
+            for (let r = 0; r < 9; r++) { if (getNotes(board, r, c).has(num)) rows.push(r); }
+            if (rows.length === 2) colsWithTwo.push({ c, rows });
+        }
+        if (rowsWithTwo.length < 1 || colsWithTwo.length < 1) continue;
+
+        // Iterate through all possible pairs of row-units and column-units
+        for (const rowUnit of rowsWithTwo) {
+            const r_base = rowUnit.r;
+            const [c1, c2] = rowUnit.cols;
+
+            for (const colUnit of colsWithTwo) {
+                const c_base = colUnit.c;
+                const [r1, r2] = colUnit.rows;
+
+                // Check if one of the row's candidate cells is also one of the column's candidate cells.
+                // This cell is the "link" of the kite.
+                // Case 1: The link is at (r_base, c1) and is part of the column c_base = c1.
+                if (c_base === c1 && (r1 === r_base || r2 === r_base)) {
+                    const r_end = (r1 === r_base) ? r2 : r1; // The other row in the column unit
+                    const c_end = c2;                         // The other col in the row unit
+                    
+                    // The elimination occurs at the cell that forms a rectangle with the link and two ends.
+                    if (getNotes(board, r_end, c_end).has(num)) {
+                        const primaryCells = [{row: r_base, col: c1}, {row: r_base, col: c2}, {row: r_end, col: c1}];
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        return { type: 'Two-String Kite', primaryCells, secondaryCells: [{row: r_end, col: c_end}], eliminations: [{ row: r_end, col: c_end, num }], solve: null };
+                    }
+                }
+                // Case 2: The link is at (r_base, c2) and is part of the column c_base = c2.
+                if (c_base === c2 && (r1 === r_base || r2 === r_base)) {
+                    const r_end = (r1 === r_base) ? r2 : r1; // The other row in the column unit
+                    const c_end = c1;                         // The other col in the row unit
+                    
+                    // The elimination occurs at the cell that forms a rectangle with the link and two ends.
+                    if (getNotes(board, r_end, c_end).has(num)) {
+                        const primaryCells = [{row: r_base, col: c2}, {row: r_base, col: c1}, {row: r_end, col: c2}];
+                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                        return { type: 'Two-String Kite', primaryCells, secondaryCells: [{row: r_end, col: c_end}], eliminations: [{ row: r_end, col: c_end, num }], solve: null };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findXyzWing = (board, targetCell) => {
+    const threeNoteCells = [], twoNoteCells = [];
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+        const notes = getNotes(board, r, c);
+        if (notes.size === 3) threeNoteCells.push({ row: r, col: c, notes: [...notes] });
+        if (notes.size === 2) twoNoteCells.push({ row: r, col: c, notes: [...notes] });
+    }
+    if (threeNoteCells.length < 1 || twoNoteCells.length < 2) return null;
+
+    for (const pivot of threeNoteCells) {
+        const pivotPeers = twoNoteCells.filter(cell => cell !== pivot && cellsSeeEachOther(pivot, cell));
+        if (pivotPeers.length < 2) continue;
+        for (const pincerA of pivotPeers) for (const pincerB of pivotPeers) {
+            if (pincerA === pincerB || !cellsSeeEachOther(pincerA, pincerB)) continue;
+
+            for (let i = 0; i < 3; i++) {
+                const z = pivot.notes[i];
+                const [x, y] = pivot.notes.filter(n => n !== z);
+                const notesA = new Set(pincerA.notes), notesB = new Set(pincerB.notes);
+                let found = false;
+                if ((notesA.has(x) && notesA.has(z) && notesB.has(y) && notesB.has(z)) || (notesA.has(y) && notesA.has(z) && notesB.has(x) && notesB.has(z))) {
+                    found = true;
+                }
+                if (found) {
+                    const primaryCells = [pivot, pincerA, pincerB];
+                    if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
+                    const eliminations = [], secondaryCells = [];
+                    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+                        if (primaryCells.some(pc => pc.row === r && pc.col === c)) continue;
+                        const currentCell = { row: r, col: c };
+                        if (cellsSeeEachOther(currentCell, pivot) && cellsSeeEachOther(currentCell, pincerA) && cellsSeeEachOther(currentCell, pincerB)) {
+                            if (getNotes(board, r, c).has(z)) {
+                                eliminations.push({ row: r, col: c, num: z });
+                                if (!secondaryCells.some(sc => sc.row === r && sc.col === c)) secondaryCells.push({ row: r, col: c });
+                            }
+                        }
+                    }
+                    if (eliminations.length > 0) return { type: 'XYZ-Wing', primaryCells, secondaryCells, eliminations, solve: null };
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findUniqueRectangle = (board, targetCell) => {
+    // Type 1
+    for (let r1 = 0; r1 < 9; r1++) for (let r2 = r1 + 1; r2 < 9; r2++) {
+        for (let c1 = 0; c1 < 9; c1++) for (let c2 = c1 + 1; c2 < 9; c2++) {
+            const corners = [
+                { row: r1, col: c1, notes: getNotes(board, r1, c1) }, { row: r1, col: c2, notes: getNotes(board, r1, c2) },
+                { row: r2, col: c1, notes: getNotes(board, r2, c1) }, { row: r2, col: c2, notes: getNotes(board, r2, c2) },
+            ];
+            const bivalueCorners = corners.filter(c => c.notes.size === 2);
+            if (bivalueCorners.length !== 3) continue;
+
+            const notesStr = [...bivalueCorners[0].notes].sort().join('');
+            if ([...bivalueCorners[1].notes].sort().join('') !== notesStr || [...bivalueCorners[2].notes].sort().join('') !== notesStr) continue;
+
+            const targetCorner = corners.find(c => !bivalueCorners.includes(c));
+            if (!targetCorner) continue;
+
+            const candidates = [...bivalueCorners[0].notes];
+            if (targetCorner.notes.has(candidates[0]) && targetCorner.notes.has(candidates[1])) {
+                const primaryCells = bivalueCorners.map(c => ({ row: c.row, col: c.col }));
+                if (targetCell && !(targetCell.row === targetCorner.row && targetCell.col === targetCorner.col)) continue;
+                return {
+                    type: 'Unique Rectangle', primaryCells, secondaryCells: [{ row: targetCorner.row, col: targetCorner.col }],
+                    eliminations: candidates.map(num => ({ row: targetCorner.row, col: targetCorner.col, num })), solve: null,
+                };
+            }
+        }
+    }
+    return null;
+}
+
 export const findHint = (board, difficulty, targetCell, technique = null) => {
     const findFunctions = {
         nakedSingle: () => findNakedSingle(board, targetCell),
@@ -669,6 +886,10 @@ export const findHint = (board, difficulty, targetCell, technique = null) => {
         swordfish: () => findSwordfish(board, targetCell),
         xyWing: () => findXyWing(board, targetCell),
         jellyfish: () => findJellyfish(board, targetCell),
+        skyscraper: () => findSkyscraper(board, targetCell),
+        twoStringKite: () => findTwoStringKite(board, targetCell),
+        xyzWing: () => findXyzWing(board, targetCell),
+        uniqueRectangle: () => findUniqueRectangle(board, targetCell),
     };
     
     // If a specific technique is requested (i.e., for rating puzzles), find and return it directly.
@@ -681,7 +902,7 @@ export const findHint = (board, difficulty, targetCell, technique = null) => {
         easy: ['nakedSingle', 'hiddenSingle'],
         medium: ['nakedSingle', 'hiddenSingle'],
         hard: ['nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 'nakedTriple', 'hiddenTriple'],
-        professional: ['nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 'nakedTriple', 'hiddenTriple', 'intersectionRemoval', 'xWing', 'swordfish', 'xyWing', 'jellyfish'],
+        professional: ['nakedSingle', 'hiddenSingle', 'nakedPair', 'hiddenPair', 'nakedTriple', 'hiddenTriple', 'intersectionRemoval', 'xWing', 'skyscraper', 'twoStringKite', 'xyWing', 'xyzWing', 'swordfish', 'jellyfish', 'uniqueRectangle'],
     };
 
     const techniquesToTry = techniquesByDifficulty[difficulty] || techniquesByDifficulty.professional;
