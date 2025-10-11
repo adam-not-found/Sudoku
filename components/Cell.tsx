@@ -66,19 +66,26 @@ export default function Cell({ data, isSelected, isPeer, isHighlighted, isCorrec
             
             const isNewlyEliminated = hintEffect?.type === 'note-pop' && hintEffect.eliminations.some(e => e.row === rowIndex && e.col === colIndex && e.num === num);
             let noteClass = '', fontWeightClass = '';
+            const isHintedCell = isHintPrimary || isHintSecondary;
 
             if (isEliminationNote) {
               noteClass = 'text-[var(--color-text-wrong)]';
               fontWeightClass = 'font-semibold';
-            } else if (isHighlighted && highlightedNumber === num) {
-              noteClass = 'bg-[var(--color-note-highlighted-bg)] text-[var(--color-note-highlighted-text)] rounded-sm';
-              fontWeightClass = 'font-bold';
             } else {
-              if (isAutoNotesEnabled) noteClass = isUserNote ? 'text-[var(--color-text-user-note)]' : 'text-[var(--color-text-note)]';
-              else noteClass = 'text-[var(--color-text-note)]';
+              if (isHintedCell) {
+                noteClass = 'text-[var(--color-hint-note-text)]';
+              } else if (isHighlighted && highlightedNumber === num) {
+                noteClass = 'bg-[var(--color-note-highlighted-bg)] text-[var(--color-note-highlighted-text)] rounded-sm';
+              } else {
+                if (isAutoNotesEnabled) noteClass = isUserNote ? 'text-[var(--color-text-user-note)]' : 'text-[var(--color-text-note)]';
+                else noteClass = 'text-[var(--color-text-note)]';
+              }
 
-              if (isNotesMode) fontWeightClass = 'font-bold';
-              else if (isUserNote || !isAutoNotesEnabled) fontWeightClass = 'font-medium';
+              if (isNotesMode || (isHighlighted && highlightedNumber === num)) {
+                  fontWeightClass = 'font-bold';
+              } else if (isUserNote || !isAutoNotesEnabled) {
+                  fontWeightClass = 'font-medium';
+              }
             }
             
             return <div key={i} className={`flex items-center justify-center transition-all duration-200 ${noteClass} ${fontWeightClass} ${isNewlyEliminated ? 'animate-pop':''}`}>{num}</div>;
