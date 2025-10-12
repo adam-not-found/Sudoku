@@ -490,7 +490,7 @@ export default function App() {
   const highlightedNumFromCell = selectedCell && board[selectedCell.row][selectedCell.col].value > 0 ? board[selectedCell.row][selectedCell.col].value : null;
   const highlightedNum = highlightedNumFromCell ?? highlightedNumPad;
   const hintDisplay = (
-    <div className="relative w-full h-6 mb-2">
+    <div className="relative w-full h-6 mb-2" onClick={(e) => e.stopPropagation()}>
       <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>
         {activeHint && (
             <button

@@ -740,8 +740,8 @@ const findSkyscraper = (board, targetCell) => {
 };
 
 const findTwoStringKite = (board, targetCell) => {
+    const getBox = (r, c) => Math.floor(r / 3) * 3 + Math.floor(c / 3);
     for (let num = 1; num <= 9; num++) {
-        // Find all rows and columns with exactly two candidates for the current number
         const rowsWithTwo = [];
         for (let r = 0; r < 9; r++) {
             const cols = [];
@@ -756,7 +756,6 @@ const findTwoStringKite = (board, targetCell) => {
         }
         if (rowsWithTwo.length < 1 || colsWithTwo.length < 1) continue;
 
-        // Iterate through all possible pairs of row-units and column-units
         for (const rowUnit of rowsWithTwo) {
             const r_base = rowUnit.r;
             const [c1, c2] = rowUnit.cols;
@@ -765,32 +764,31 @@ const findTwoStringKite = (board, targetCell) => {
                 const c_base = colUnit.c;
                 const [r1, r2] = colUnit.rows;
 
-                // Check if one of the row's candidate cells is also one of the column's candidate cells.
-                // This cell is the "link" of the kite.
-                // Case 1: The link is at (r_base, c1) and is part of the column c_base = c1.
-                if (c_base === c1 && (r1 === r_base || r2 === r_base)) {
-                    const r_end = (r1 === r_base) ? r2 : r1; // The other row in the column unit
-                    const c_end = c2;                         // The other col in the row unit
-                    
-                    // The elimination occurs at the cell that forms a rectangle with the link and two ends.
-                    if (getNotes(board, r_end, c_end).has(num)) {
-                        const primaryCells = [{row: r_base, col: c1}, {row: r_base, col: c2}, {row: r_end, col: c1}];
-                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
-                        return { type: 'Two-String Kite', primaryCells, secondaryCells: [{row: r_end, col: c_end}], eliminations: [{ row: r_end, col: c_end, num }], solve: null };
+                const processCase = (linkCol, endCol) => {
+                    if (c_base === linkCol && (r1 === r_base || r2 === r_base)) {
+                        const r_end = (r1 === r_base) ? r2 : r1;
+                        const c_end = endCol;
+                        
+                        const rowEnd = { r: r_base, c: c_end };
+                        const colEnd = { r: r_end, c: c_base };
+                        if (getBox(rowEnd.r, rowEnd.c) === getBox(colEnd.r, colEnd.c)) {
+                            return null;
+                        }
+
+                        if (getNotes(board, r_end, c_end).has(num)) {
+                            const primaryCells = [{row: r_base, col: linkCol}, {row: r_base, col: endCol}, {row: r_end, col: linkCol}];
+                            if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) return null;
+                            return { type: 'Two-String Kite', primaryCells, secondaryCells: [{row: r_end, col: c_end}], eliminations: [{ row: r_end, col: c_end, num }], solve: null };
+                        }
                     }
+                    return null;
                 }
-                // Case 2: The link is at (r_base, c2) and is part of the column c_base = c2.
-                if (c_base === c2 && (r1 === r_base || r2 === r_base)) {
-                    const r_end = (r1 === r_base) ? r2 : r1; // The other row in the column unit
-                    const c_end = c1;                         // The other col in the row unit
-                    
-                    // The elimination occurs at the cell that forms a rectangle with the link and two ends.
-                    if (getNotes(board, r_end, c_end).has(num)) {
-                        const primaryCells = [{row: r_base, col: c2}, {row: r_base, col: c1}, {row: r_end, col: c2}];
-                        if (targetCell && !primaryCells.some(pc => pc.row === targetCell.row && pc.col === targetCell.col)) continue;
-                        return { type: 'Two-String Kite', primaryCells, secondaryCells: [{row: r_end, col: c_end}], eliminations: [{ row: r_end, col: c_end, num }], solve: null };
-                    }
-                }
+
+                let hint = processCase(c1, c2);
+                if (hint) return hint;
+                
+                hint = processCase(c2, c1);
+                if (hint) return hint;
             }
         }
     }
