@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { generateSudoku } from './services/sudokuGenerator';
+import { generateSudoku, solveGrid } from './services/sudokuGenerator';
 import { calculateCandidates, findHint } from './services/hintService';
 import SudokuBoard from './components/SudokuBoard';
 import NumberPad from './components/NumberPad';
@@ -10,6 +9,7 @@ import VictoryScreen from './components/VictoryScreen';
 import SettingsPanel from './components/SettingsPanel';
 import StatsPanel from './components/StatsPanel';
 import { themes } from './components/themes';
+import { ShareIcon } from './components/icons';
 
 export default function App() {
   const [board, setBoard] = useState([]);
@@ -46,6 +46,8 @@ export default function App() {
   const [isTimerVisible, setIsTimerVisible] = useState(() => localStorage.getItem('sudoku-timer-visible') === 'true');
   const [highlightedNumPad, setHighlightedNumPad] = useState(null);
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
+  const [initialPuzzle, setInitialPuzzle] = useState('');
+  const [shareFeedback, setShareFeedback] = useState('');
 
   const isUIBlocked = isSettingsOpen || isStatsOpen;
 
@@ -85,6 +87,8 @@ export default function App() {
     // Defer the heavy computation
     setTimeout(() => {
         const { puzzle: newPuzzle, solution: newSolution } = generateSudoku(gameDifficulty);
+        const puzzleString = newPuzzle.map(row => row.join('')).join('');
+        setInitialPuzzle(puzzleString);
         setStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
         setSolution(newSolution);
         
@@ -114,6 +118,57 @@ export default function App() {
         setMistakesCount(0);
     }, 10);
   }, [isAutoNotesEnabled]);
+  
+  const startSharedGame = useCallback((puzzleString) => {
+    // Fallback for invalid puzzle strings
+    if (!puzzleString || puzzleString.length !== 81 || !/^\d+$/.test(puzzleString)) {
+        startNewGame(difficulty);
+        return;
+    }
+    setBoard([]); // Show loading screen
+    setTimeout(() => {
+        const newPuzzle = [];
+        for (let i = 0; i < 9; i++) {
+            newPuzzle.push(puzzleString.substring(i * 9, i * 9 + 9).split('').map(Number));
+        }
+
+        const newSolutionGrid = newPuzzle.map(row => [...row]);
+        if (!solveGrid(newSolutionGrid)) {
+            console.error("Shared puzzle is unsolvable.");
+            startNewGame(difficulty);
+            return;
+        }
+
+        setInitialPuzzle(puzzleString);
+        setStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
+        setSolution(newSolutionGrid);
+        
+        let newBoard = newPuzzle.map(row => row.map(value => ({ value, isInitial: value !== 0, isWrong: false, userNotes: new Set(), autoNotes: new Set(), eliminatedNotes: new Set() })));
+        
+        if (isAutoNotesEnabled) {
+          for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) if (newBoard[r][c].value === 0) newBoard[r][c].autoNotes = calculateCandidates(newBoard, r, c);
+        }
+        
+        setBoard(newBoard);
+        setSelectedCell(null);
+        setHighlightedNumPad(null);
+        setIsNotesMode(false);
+        setHistory([]);
+        setRedoHistory([]);
+        setIsGameWon(false);
+        setAnimationState('idle');
+        setActiveHint(null);
+        setHintEffect(null);
+        setHintButtonEffect(null);
+        setIsHintOnCooldown(false);
+        if (cooldownIntervalRef.current) clearTimeout(cooldownIntervalRef.current);
+        setHintUsageCount(0);
+        setElapsedTime(0);
+        setIsTimerRunning(true);
+        setMovesCount(0);
+        setMistakesCount(0);
+    }, 10);
+  }, [isAutoNotesEnabled, difficulty, startNewGame]);
   
   const deepCopyBoard = (board) => board.map(r => r.map(c => ({...c, userNotes: new Set(c.userNotes), autoNotes: new Set(c.autoNotes), eliminatedNotes: new Set(c.eliminatedNotes)})));
   
@@ -238,6 +293,37 @@ export default function App() {
     }
   }, [isGameWon]);
   
+  const handleShare = async () => {
+    if (!initialPuzzle) return;
+    const url = new URL(window.location.href);
+    url.search = ''; // Clear existing params to create a clean link
+    url.searchParams.set('puzzle', initialPuzzle);
+    
+    const shareData = {
+        title: 'Sudoku Challenge',
+        text: 'Think you can solve this Sudoku puzzle I just completed?',
+        url: url.toString(),
+    };
+
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+        } catch (err) {
+            // User cancelled share is not an error
+        }
+    } else {
+        try {
+            await navigator.clipboard.writeText(shareData.url);
+            setShareFeedback('Link Copied!');
+            setTimeout(() => setShareFeedback(''), 2000);
+        } catch (err) {
+            console.error('Failed to copy link: ', err);
+            setShareFeedback('Failed to copy!');
+            setTimeout(() => setShareFeedback(''), 2000);
+        }
+    }
+  };
+
   // Update isDarkMode based on colorMode
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -254,9 +340,6 @@ export default function App() {
   useEffect(() => {
     const themeData = themes[theme]?.[isDarkMode ? 'dark' : 'light'] || themes.default[isDarkMode ? 'dark' : 'light'];
     for (const [key, value] of Object.entries(themeData)) {
-      // FIX: The value from Object.entries can be inferred as 'unknown' in some TypeScript
-      // configurations, causing a type error with `setProperty`. Explicitly converting
-      // the value to a string ensures type safety.
       document.documentElement.style.setProperty(key, String(value));
     }
     localStorage.setItem('sudoku-theme', theme);
@@ -269,15 +352,20 @@ export default function App() {
   
   useEffect(() => {
     const serialize = (k, v) => v instanceof Set ? { __dataType: 'Set', value: [...v] } : v;
-    // FIX: The error is caused by an unsafe reviver function in `JSON.parse`.
-    // The `v.value` is not guaranteed to be iterable for `new Set()`. This fix
-    // ensures `v` is a properly structured object and `v.value` is an array before 
-    // constructing a Set, preventing a potential runtime error that a strict 
-    // linter may flag as a type issue.
     const deserialize = (k, v) => (v && typeof v === 'object' && v.__dataType === 'Set' && Array.isArray(v.value)) ? new Set(v.value) : v;
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const puzzleString = urlParams.get('puzzle');
+    
+    if (puzzleString) {
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+    
     const saved = localStorage.getItem('sudoku-saved-game');
-    if (saved) {
+    
+    if (puzzleString) {
+        startSharedGame(puzzleString);
+    } else if (saved) {
         try {
             const gameState = JSON.parse(saved, deserialize);
             setBoard(gameState.board);
@@ -289,6 +377,9 @@ export default function App() {
             setMistakesCount(gameState.mistakesCount || 0);
             setHintUsageCount(gameState.hintUsageCount || 0);
             if (gameState.difficulty) setDifficulty(gameState.difficulty);
+            // Re-initialize initialPuzzle from the loaded board state for sharing
+            const loadedPuzzleString = gameState.board.map(r => r.map(c => c.isInitial ? c.value : 0).join('')).join('');
+            setInitialPuzzle(loadedPuzzleString);
             setIsTimerRunning(true);
         } catch(e) { startNewGame(difficulty); }
     } else {
@@ -371,7 +462,17 @@ export default function App() {
               <div className="relative w-full flex justify-center" style={{minHeight: '80px'}}>
 
                 <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out transform ${isGameWon ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{transitionDelay: isGameWon ? '250ms' : '0ms'}} onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => startNewGame(difficulty)} className="bg-[var(--color-controls-bg)] text-[var(--color-controls-text)] font-bold py-4 px-16 rounded-full text-2xl hover:bg-[var(--color-controls-bg-hover)] transition-colors transform active:scale-95 shadow-lg"><span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>Play Again</span></button>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => startNewGame(difficulty)} className="bg-[var(--color-controls-bg)] text-[var(--color-controls-text)] font-bold py-4 px-12 rounded-full text-2xl hover:bg-[var(--color-controls-bg-hover)] transition-colors transform active:scale-95 shadow-lg"><span className={`transition-opacity duration-300 ease-in-out ${isGameWon ? 'opacity-100' : 'opacity-0'}`} style={{transitionDelay: isGameWon ? '400ms' : '0ms'}}>Play Again</span></button>
+                    <div className="relative">
+                      <button onClick={handleShare} className="w-16 h-16 flex items-center justify-center bg-[var(--color-controls-bg)] text-[var(--color-controls-text)] rounded-full hover:bg-[var(--color-controls-bg-hover)] transition-colors transform active:scale-95 shadow-lg" aria-label="Share Game">
+                          <ShareIcon />
+                      </button>
+                      <div className={`pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-1 text-sm rounded-md bg-black/70 text-white transition-all duration-300 ${shareFeedback ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                          {shareFeedback}
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isGameWon ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>

@@ -26,7 +26,7 @@ const isSafe = (grid, row, col, num) => {
   return true;
 };
 
-const solveGrid = (grid) => {
+export const solveGrid = (grid) => {
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
       if (grid[row][col] === 0) {
