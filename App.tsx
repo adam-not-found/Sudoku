@@ -8,6 +8,7 @@ import Header from './components/Header';
 import VictoryScreen from './components/VictoryScreen';
 import SettingsPanel from './components/SettingsPanel';
 import StatsPanel from './components/StatsPanel';
+import HintTutorial from './components/HintTutorial';
 import { themes } from './components/themes';
 import { ShareIcon } from './components/icons';
 
@@ -82,8 +83,9 @@ export default function App() {
   const [initialPuzzle, setInitialPuzzle] = useState('');
   const [shareFeedback, setShareFeedback] = useState('');
   const [lastGameScore, setLastGameScore] = useState(null);
+  const [tutorialHintType, setTutorialHintType] = useState(null);
 
-  const isUIBlocked = isSettingsOpen || isStatsOpen;
+  const isUIBlocked = isSettingsOpen || isStatsOpen || !!tutorialHintType;
 
   const startCooldown = useCallback(() => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
@@ -484,7 +486,21 @@ export default function App() {
   
   const highlightedNumFromCell = selectedCell && board[selectedCell.row][selectedCell.col].value > 0 ? board[selectedCell.row][selectedCell.col].value : null;
   const highlightedNum = highlightedNumFromCell ?? highlightedNumPad;
-  const hintDisplay = <div className="relative w-full h-6 mb-2"><div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>{activeHint && <div className={`px-4 py-1 rounded-full text-sm font-bold shadow-md bg-[var(--color-ui-bg-secondary)] text-[var(--color-hint-text)]`}>{activeHint.type}</div>}</div></div>;
+  const hintDisplay = (
+    <div className="relative w-full h-6 mb-2">
+      <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${activeHint ? 'opacity-100' : 'opacity-0'}`}>
+        {activeHint && (
+            <button
+              onClick={() => setTutorialHintType(activeHint.type)}
+              className="px-4 py-1 rounded-full text-sm font-bold shadow-md bg-[var(--color-ui-bg-secondary)] text-[var(--color-hint-text)] hover:bg-[var(--color-ui-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-accent)] focus:ring-offset-[var(--color-page-bg)]"
+              aria-label={`Learn about ${activeHint.type}`}
+            >
+              {activeHint.type}
+            </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); setShowNewGameConfirm(false); }}>
@@ -567,6 +583,7 @@ export default function App() {
         isTimerVisible={isTimerVisible} onSetIsTimerVisible={setIsTimerVisible} 
       />
       <StatsPanel isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} stats={stats} />
+      <HintTutorial hintType={tutorialHintType} onClose={() => setTutorialHintType(null)} />
     </div>
   );
 }
