@@ -9,16 +9,18 @@ function StatItem({ label, value }) {
     );
 }
 
-export default function VictoryScreen({ message, moves, time, mistakes, hints }) {
+export default function VictoryScreen({ message, moves, time, mistakes, hints, score }) {
   const [showContainer, setShowContainer] = useState(false);
   const [showTitle, setShowTitle] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showScore, setShowScore] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setShowContainer(true), 100);
     const t2 = setTimeout(() => setShowTitle(true), 300);
     const t3 = setTimeout(() => setShowStats(true), 500);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    const t4 = setTimeout(() => setShowScore(true), 700);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, []);
 
   const titleSize = message.length > 35 ? 'text-xl sm:text-2xl' : (message.length > 20 ? 'text-2xl sm:text-3xl' : 'text-3xl');
@@ -33,6 +35,12 @@ export default function VictoryScreen({ message, moves, time, mistakes, hints })
           <StatItem label="Mistakes" value={mistakes} />
           <StatItem label="Hints" value={hints} />
         </div>
+        {score !== null && (
+          <div className={`flex flex-col items-center mt-2 pt-2 border-t border-[var(--color-victory-stat-label)] border-opacity-30 w-full transition-all duration-500 ease-in-out ${showScore ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`} style={{transitionDelay: '200ms'}}>
+              <span className="text-sm font-medium text-[var(--color-victory-stat-label)] uppercase tracking-wider">Final Score</span>
+              <span className="text-5xl font-bold text-[var(--color-victory-title)]">{score.toLocaleString()}</span>
+          </div>
+        )}
       </div>
     </div>
   );

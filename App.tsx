@@ -11,6 +11,31 @@ import StatsPanel from './components/StatsPanel';
 import { themes } from './components/themes';
 import { ShareIcon } from './components/icons';
 
+const calculateScore = (difficulty, elapsedTime, movesCount, mistakesCount, hintUsageCount, isAutoNotesEnabled) => {
+    const basePoints = 1500;
+    const timePenalty = Math.floor(elapsedTime / 1000 / 3); // 1 point per 3 seconds
+    const movesPenalty = movesCount * 5;
+    const mistakesPenalty = mistakesCount * 50;
+    const hintsPenalty = hintUsageCount * 100;
+
+    const difficultyMultiplier = {
+        easy: 0.8,
+        medium: 1.0,
+        hard: 1.2,
+        professional: 1.5,
+    };
+    
+    const autoNotesMultiplier = isAutoNotesEnabled ? 1.0 : 1.25; // 25% bonus for not using auto-notes
+
+    let score = Math.max(0, basePoints - timePenalty - movesPenalty - mistakesPenalty - hintsPenalty);
+    score *= (difficultyMultiplier[difficulty] || 1.0);
+    score *= autoNotesMultiplier;
+    
+    const finalScore = Math.round(score);
+    
+    return finalScore;
+};
+
 export default function App() {
   const [board, setBoard] = useState([]);
   const [solution, setSolution] = useState([]);
@@ -32,7 +57,15 @@ export default function App() {
   const [colorMode, setColorMode] = useState(() => localStorage.getItem('sudoku-color-mode') || 'system'); // 'light', 'dark', 'system'
   const [isDarkMode, setIsDarkMode] = useState(false); // This is now derived from colorMode
 
-  const [stats, setStats] = useState(() => { try { return JSON.parse(localStorage.getItem('sudoku-stats')) || {gamesPlayed:0,gamesWon:0,totalMoves:0,totalMistakes:0,byDifficulty:{easy:{wins:0,bestTime:null,totalTime:0},medium:{wins:0,bestTime:null,totalTime:0},hard:{wins:0,bestTime:null,totalTime:0},professional:{wins:0,bestTime:null,totalTime:0}}}; } catch (e) { return {gamesPlayed:0,gamesWon:0,totalMoves:0,totalMistakes:0,byDifficulty:{easy:{wins:0,bestTime:null,totalTime:0},medium:{wins:0,bestTime:null,totalTime:0},hard:{wins:0,bestTime:null,totalTime:0},professional:{wins:0,bestTime:null,totalTime:0}}}; }});
+  const [stats, setStats] = useState(() => { 
+    try { 
+      const saved = JSON.parse(localStorage.getItem('sudoku-stats'));
+      const defaultStats = {gamesPlayed:0,gamesWon:0,totalMoves:0,totalMistakes:0,highScore:0,byDifficulty:{easy:{wins:0,bestTime:null,totalTime:0},medium:{wins:0,bestTime:null,totalTime:0},hard:{wins:0,bestTime:null,totalTime:0},professional:{wins:0,bestTime:null,totalTime:0}}};
+      return { ...defaultStats, ...saved };
+    } catch (e) { 
+      return {gamesPlayed:0,gamesWon:0,totalMoves:0,totalMistakes:0,highScore:0,byDifficulty:{easy:{wins:0,bestTime:null,totalTime:0},medium:{wins:0,bestTime:null,totalTime:0},hard:{wins:0,bestTime:null,totalTime:0},professional:{wins:0,bestTime:null,totalTime:0}}}; 
+    }
+  });
   const [activeHint, setActiveHint] = useState(null);
   const [isHintOnCooldown, setIsHintOnCooldown] = useState(false);
   const [hintUsageCount, setHintUsageCount] = useState(0);
@@ -48,6 +81,7 @@ export default function App() {
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const [initialPuzzle, setInitialPuzzle] = useState('');
   const [shareFeedback, setShareFeedback] = useState('');
+  const [lastGameScore, setLastGameScore] = useState(null);
 
   const isUIBlocked = isSettingsOpen || isStatsOpen;
 
@@ -63,17 +97,22 @@ export default function App() {
     setIsTimerRunning(false);
     const msgs = ["Perfectly solved.", "This solve was... inevitable.", "Numbers... Assemble.", "That's my secret: I'm always thinking.", "The Logic is strong with this one.", "This is the way.", "We will watch your career with great interest.", "True Jedi.", "Never tell me the odds!", "My precious... solution.", "One does not simply solve this grid... but you did.", "Mischief Managed.", "You're a wizard, solver.", "10 points for that solve!", "Houston, we have a solution.", "Are you not entertained?!", "This puzzle has been terminated.", "What a solve!", "This is Sudoku!"];
     const gameDuration = elapsedTime;
+    
+    const gameScore = calculateScore(difficulty, elapsedTime, movesCount, mistakesCount, hintUsageCount, isAutoNotesEnabled);
+    setLastGameScore(gameScore);
+
     setStats(prev => {
       const diffStats = prev.byDifficulty[difficulty];
       const best = diffStats.bestTime === null || gameDuration < diffStats.bestTime ? gameDuration : diffStats.bestTime;
-      return {...prev, gamesWon: prev.gamesWon+1, totalMoves: prev.totalMoves+movesCount, totalMistakes: prev.totalMistakes+mistakesCount, byDifficulty: {...prev.byDifficulty, [difficulty]: { wins: diffStats.wins+1, bestTime: best, totalTime: diffStats.totalTime+gameDuration }}};
+      const newHighScore = Math.max(prev.highScore || 0, gameScore);
+      return {...prev, gamesWon: prev.gamesWon+1, totalMoves: prev.totalMoves+movesCount, totalMistakes: prev.totalMistakes+mistakesCount, highScore: newHighScore, byDifficulty: {...prev.byDifficulty, [difficulty]: { wins: diffStats.wins+1, bestTime: best, totalTime: diffStats.totalTime+gameDuration }}};
     });
     setVictoryMessage(msgs[Math.floor(Math.random() * msgs.length)]);
     setIsGameWon(true);
     setSelectedCell(null);
     setActiveHint(null);
     localStorage.removeItem('sudoku-saved-game');
-  }, [elapsedTime, difficulty, movesCount, mistakesCount]);
+  }, [elapsedTime, difficulty, movesCount, mistakesCount, hintUsageCount, isAutoNotesEnabled]);
 
   const checkWinCondition = useCallback((board) => {
     if (solution.length === 0) return false;
@@ -116,6 +155,7 @@ export default function App() {
         setIsTimerRunning(true);
         setMovesCount(0);
         setMistakesCount(0);
+        setLastGameScore(null);
     }, 10);
   }, [isAutoNotesEnabled]);
   
@@ -167,6 +207,7 @@ export default function App() {
         setIsTimerRunning(true);
         setMovesCount(0);
         setMistakesCount(0);
+        setLastGameScore(null);
     }, 10);
   }, [isAutoNotesEnabled, difficulty, startNewGame]);
   
@@ -452,7 +493,7 @@ export default function App() {
         <main className={`w-full max-w-lg flex flex-col items-center gap-2 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''} mt-8 md:mt-0`}>
             {hintDisplay}
             <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
-              {animationState !== 'idle' && <VictoryScreen message={victoryMessage} moves={movesCount} time={formatTime(elapsedTime)} mistakes={mistakesCount} hints={hintUsageCount} />}
+              {animationState !== 'idle' && <VictoryScreen message={victoryMessage} moves={movesCount} time={formatTime(elapsedTime)} mistakes={mistakesCount} hints={hintUsageCount} score={lastGameScore} />}
               <SudokuBoard board={board} solution={solution} selectedCell={selectedCell} onCellClick={(r, c) => { if (isGameWon) return; if (activeHint) setActiveHint(null); setSelectedCell(p => p?.row === r && p?.col === c ? null : {row: r, col: c})}} isNotesMode={isNotesMode} isDarkMode={isDarkMode} forceDarkMode={isGameWon} isAutoNotesEnabled={isAutoNotesEnabled} isHighlightNotesEnabled={isHighlightNotesEnabled} highlightedNumber={highlightedNum} activeHint={activeHint} hintEffect={hintEffect} />
             </div>
             <div className="relative w-full flex flex-col items-center gap-0 mt-4">
