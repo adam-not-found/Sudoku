@@ -296,7 +296,10 @@ export default function App() {
         setActiveHint(null);
         return;
     }
-    const hint = findHint(board, difficulty, selectedCell);
+    
+    setSelectedCell(null);
+    const hint = findHint(board, difficulty, null);
+
     if (hint) {
         setActiveHint(hint);
         if (hint.primaryCells.length === 1 && hint.solve) setHintEffect({ type: 'cell-glow', cell: hint.primaryCells[0] });
@@ -306,7 +309,7 @@ export default function App() {
         setHintButtonEffect('shake');
         setTimeout(() => setHintButtonEffect(null), 300);
     }
-  }, [board, isHintOnCooldown, selectedCell, isGameWon, solution, activeHint, difficulty, placeNumberOnBoard, startCooldown]);
+  }, [board, isHintOnCooldown, isGameWon, solution, activeHint, difficulty, placeNumberOnBoard, startCooldown]);
   
   const handleSetAutoNotes = (enabled) => {
     setIsAutoNotesEnabled(enabled);
@@ -472,7 +475,7 @@ export default function App() {
         case 'ArrowLeft': setSelectedCell({ row, col: Math.max(0, col - 1) }); e.preventDefault(); break;
         case 'ArrowRight': setSelectedCell({ row, col: Math.min(8, col + 1) }); e.preventDefault(); break;
         case 'Backspace': case 'Delete': handleDelete(); e.preventDefault(); break;
-        case 'Escape': setSelectedCell(null); e.preventDefault(); break;
+        case 'Escape': setSelectedCell(null); setActiveHint(null); e.preventDefault(); break;
         default: if (!isNaN(e.key) && e.key >= 1 && e.key <= 9) handleNumberClick(Number(e.key)); break;
       }
     };
@@ -503,7 +506,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); setShowNewGameConfirm(false); }}>
+    <div className="min-h-screen font-sans relative" onClick={() => { setSelectedCell(null); setHighlightedNumPad(null); setShowNewGameConfirm(false); setActiveHint(null); }}>
       <Header onOpenSettings={() => setIsSettingsOpen(true)} onOpenStats={() => setIsStatsOpen(true)} onTitleClick={handleToggleNewGameConfirm} isNewGameConfirmOpen={showNewGameConfirm} />
       <div className={`min-h-screen flex flex-col items-center justify-start md:justify-center pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4`}>
         <main className={`w-full max-w-lg flex flex-col items-center gap-2 transition-all duration-300 ${isUIBlocked ? 'blur-sm pointer-events-none' : ''} mt-8 md:mt-0`}>
